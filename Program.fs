@@ -2,7 +2,7 @@ open System
 open Argu
 
 type BackupArgs =
-    | [<MainCommand>] Games of games: string
+    | [<MainCommand>] Games of games: string list
     | [<AltCommandLine("-l")>] Loop
     | [<AltCommandLine("-v")>] Verbose
 
@@ -29,7 +29,7 @@ type AddArgs =
                 **/* which will recursively back up all saves in SAVE_PATH"
 
 type InfoArgs =
-    | [<MainCommand>] Games of games: string
+    | [<MainCommand>] Games of games: string list
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -47,7 +47,7 @@ type ListArgs =
             | Verbose -> "Show verbose output"
 
 type RemoveArgs =
-    | [<MainCommand; Mandatory>] Games of games: string
+    | [<MainCommand; Mandatory>] Games of games: string list
     | [<AltCommandLine("-y")>] Yes
 
     interface IArgParserTemplate with
@@ -111,16 +111,16 @@ type SbuArgs =
             | Config_Path _ -> "Path to configuration file"
             | Version -> "Print version information"
 
-let backup games loop verbose = printfn $"{games} {loop} {verbose}"
-let add game path glob = printfn $"{game} {path} {glob}"
-let list verbose = printfn $"{verbose}"
-let info games = printfn $"{games}"
-let remove games yes = printfn $"{games} {yes}"
+let backup (games: string list option) (loop: bool) (verbose: bool) = printfn $"{games} {loop} {verbose}"
+let add (game: string) (path: string) (glob: string option) = printfn $"{game} {path} {glob}"
+let list (verbose: bool) = printfn $"{verbose}"
+let info (games: string list option) = printfn $"{games}"
+let remove (games: string list) (yes: bool) = printfn $"{games} {yes}"
 
-let edit game newName newPath newGlob =
+let edit (game: string) (newName: string option) (newPath: string option) (newGlob: string option) =
     printfn $"{game} {newName} {newPath} {newGlob}"
 
-let config path frequency numToKeep =
+let config (path: string option) (frequency: int option) (numToKeep: int option) =
     printfn $"{path} {frequency} {numToKeep}"
 
 let parser =
@@ -133,11 +133,11 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         match result.GetSubCommand() with
-        | Backup sp -> backup (sp.GetResults BackupArgs.Games) (sp.Contains Loop) (sp.Contains BackupArgs.Verbose)
+        | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains BackupArgs.Verbose)
         | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
         | List sp -> list (sp.Contains Verbose)
-        | Info sp -> info (sp.GetResults InfoArgs.Games)
-        | Remove sp -> remove (sp.GetResults Games) (sp.Contains Yes)
+        | Info sp -> info (sp.TryGetResult InfoArgs.Games)
+        | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
         | Edit sp ->
             edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
         | Config sp -> config (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
