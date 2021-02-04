@@ -120,10 +120,13 @@ type Config =
 
 let defaultGlob = "**/*"
 
-let printWithColor color s =
+let withColor color f =
     Console.ForegroundColor <- color
-    printfn "%s" s
+    f ()
     Console.ResetColor()
+
+let printWithColor color s =
+    withColor color (fun () -> printfn "%s" s)
 
 let warn (s: string) =
     "Warning: " + s
@@ -324,19 +327,22 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) conf
             gameNames'
 
     if not (Seq.isEmpty warnings) then
-        printf
-            "\n%d warning%s occurred:"
-            (Seq.length warnings)
-            (if Seq.length warnings = 1 then
-                 ""
-             else
-                 "s")
+        withColor
+            ConsoleColor.Yellow
+            (fun () ->
+                printf
+                    "\n%d warning%s occurred:"
+                    (Seq.length warnings)
+                    (if Seq.length warnings = 1 then
+                         ""
+                     else
+                         "s")
 
-        if verbose then
-            printfn "\n"
-            Seq.iter (printfn "%s") warnings
-        else
-            printfn "\nPass --verbose flag to print all warnings after backup completes\n"
+                if verbose then
+                    printfn "\n"
+                    Seq.iter (printfn "%s") warnings
+                else
+                    printfn "\nPass --verbose flag to print all warnings after backup completes\n")
 
     if loop then
         Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
