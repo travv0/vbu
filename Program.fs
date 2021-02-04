@@ -300,7 +300,7 @@ let backupGame gameName verbose config =
 
             warnings
         else
-            printfn $"Path set for {gameName} doesn't exist: {game.Path}"
+            warn $"Path set for {gameName} doesn't exist: {game.Path}"
             Seq.empty
     | None ->
         warnMissingGames [ gameName ] config
@@ -560,7 +560,7 @@ let main argv =
                     |> File.ReadAllText
                     |> JsonSerializer.Deserialize<Config>
                 with e ->
-                    printfn $"{e.Message} Using default configuration."
+                    warn $"{e.Message} Using default configuration."
                     defaultConfig
 
             let command = result.GetSubCommand()
