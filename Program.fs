@@ -153,13 +153,11 @@ let printGame game newName newPath newGlob =
 
 let rec backupFile game basePath glob fromPath toPath =
     try
-        let fromModTime = File.GetLastWriteTimeUtc(fromPath)
-
         let globMatches () =
             let glob =
                 Glob.Parse(Path.Join(basePath, Option.defaultValue defaultGlob glob))
 
-            glob.IsMatch(fromPath)
+            glob.IsMatch(fromPath: string)
 
         let copyAndCleanup () =
             Directory.CreateDirectory(Directory.GetParent(toPath).FullName)
@@ -167,11 +165,12 @@ let rec backupFile game basePath glob fromPath toPath =
 
             printfn "%s ==>\n\t%s" fromPath toPath
             File.Copy(fromPath, toPath)
-            File.SetLastWriteTimeUtc(toPath, fromModTime)
             // cleanupBackups toPath
             (1, [||])
 
         let backupFile' () =
+            let fromModTime = File.GetLastWriteTimeUtc(fromPath)
+
             let toModTime =
                 if File.Exists(toPath) then
                     Some(File.GetLastWriteTimeUtc(toPath))
