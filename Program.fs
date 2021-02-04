@@ -85,6 +85,7 @@ type ConfigArgs =
             | Frequency _ -> "Set frequency in minutes to backup saves when looping"
             | Keep _ -> "Set how many copies of each backed-up file to keep"
 
+[<HelpDescription("Show this help text"); HelpFlags("--help", "-h"); NoAppSettings>]
 type SbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Backup of ParseResults<BackupArgs>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddArgs>
@@ -548,7 +549,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if result.Contains Version then
-            printfn "sbu v0.0.3"
+            printfn "sbu v0.0.4"
         else
             let configPath =
                 result.TryGetResult Config_Path
