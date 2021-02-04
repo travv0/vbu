@@ -139,12 +139,10 @@ let err (s: string) =
 let warnMissingGames games config =
     let mutable warningPrinted = false
 
-    Seq.iter
-        (fun gn ->
-            if not (Seq.exists (fun g -> g.Name = gn) config.Games) then
-                warn $"No game named `{gn}'"
-                warningPrinted <- true)
-        games
+    for game in games do
+        if not (Seq.exists (fun g -> g.Name = game) config.Games) then
+            warn $"No game named `{game}'"
+            warningPrinted <- true
 
     if warningPrinted then printfn ""
 
@@ -184,20 +182,13 @@ let cleanupBackups (backupPath: string) verbose config =
 
         if (Seq.length files > config.NumToKeep) then
             let sortedFiles =
-                Seq.sortWith
-                    (fun f1 f2 ->
-                        let modTime1 = File.GetLastWriteTimeUtc f1
-                        let modTime2 = File.GetLastWriteTimeUtc f2
-                        compare modTime2 modTime1)
-                    files
+                Seq.sortWith (fun f1 f2 -> compare (File.GetLastWriteTimeUtc f2) (File.GetLastWriteTimeUtc f1)) files
 
             let filesToDelete = Seq.skip config.NumToKeep sortedFiles
 
-            Seq.iter
-                (fun f ->
-                    if verbose then warn $"Deleting {f}"
-                    File.Delete(f))
-                filesToDelete
+            for file in filesToDelete do
+                if verbose then warn $"Deleting {file}"
+                File.Delete(file)
 
 let rec backupFile game basePath glob fromPath toPath verbose config =
     try
@@ -424,16 +415,17 @@ let remove (games: string list) (yes: bool) config =
     warnMissingGames games config
 
     let newGames =
-        Array.filter
-            (fun g ->
-                if Seq.contains g.Name games
-                   && (yes
-                       || promptYorN ("Are you sure you want to remove " + g.Name + "?")) then
-                    printfn "Removed %s" g.Name
-                    false
-                else
-                    true)
-            config.Games
+        [| for game in config.Games do
+            if Seq.contains game.Name games
+               && (yes
+                   || promptYorN (
+                       "Are you sure you want to remove "
+                       + game.Name
+                       + "?"
+                   )) then
+                printfn "Removed %s" game.Name
+            else
+                yield game |]
 
     Some { config with Games = newGames }
 
