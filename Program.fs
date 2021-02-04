@@ -216,17 +216,11 @@ let remove (games: string list) (yes: bool) config =
     Some { config with Games = newGames }
 
 let edit (gameName: string) (newName: string option) (newPath: string option) (newGlob: string option) config =
-    let game =
-        Array.tryFind (fun g -> g.Name = gameName) config.Games
-
-    match (game, newName, newPath, newGlob) with
-    | (None, _, _, _) ->
-        printfn "Error: Game with the name %s doesn't exist" gameName
-        None
-    | (_, None, None, None) ->
+    match (newName, newPath, newGlob) with
+    | (None, None, None) ->
         printfn "Error: One or more of --name, --path, or --glob must be provided."
         None
-    | (Some game, _, _, _) ->
+    | _ ->
         let mSplitList =
             Array.tryFindIndex (fun g -> g.Name = gameName) config.Games
             |> Option.map (fun i -> Array.toList config.Games |> List.splitAt i)
