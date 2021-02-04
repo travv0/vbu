@@ -116,13 +116,33 @@ type Config =
       NumToKeep: int
       Games: Game [] }
 
-let mutable config =
-    { Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbufs-backups")
-      Frequency = 15
-      NumToKeep = 20
-      Games = [||] }
+let warnMissingGames games config =
+    List.iter
+        (fun gn ->
+            if (Array.exists (fun g -> g.Name = gn) config.Games) then
+                printfn "Warning: No game named `%s'" gn)
+        games
 
-let backup (games: string list option) (loop: bool) (verbose: bool) =
+let printConfigRow label value newValue =
+    printfn "%s: %s%s" label value
+    <| match newValue with
+       | Some nv when value = nv -> ""
+       | Some nv -> sprintf " -> %s" nv
+       | None -> ""
+
+let printGame game newName newPath newGlob =
+    printConfigRow "Name" game.Name newName
+    printConfigRow "Save path" game.Path newPath
+
+    match (game.Glob, newGlob) with
+    | (Some _, _)
+    | (None, Some _) ->
+        printConfigRow "Save glob" (Option.defaultValue "" game.Glob) (Some(Option.defaultValue "" newGlob))
+    | _ -> ()
+
+    printfn ""
+
+let backup (games: string list option) (loop: bool) (verbose: bool) config =
     printfn $"{games} {loop} {verbose}"
     None
 
@@ -135,13 +155,13 @@ let validGameNameChars =
 let isValidGameName (name: string) =
     Array.TrueForAll(Array.ofSeq name, (fun c -> Array.contains c validGameNameChars))
 
-let add (game: string) (path: string) (glob: string option) =
+let add (game: string) (path: string) (glob: string option) config =
     if Array.exists (fun g -> g.Name = game) config.Games then
-        printfn "Game with the name %s already exists" game
+        printfn "Error: Game with the name %s already exists" game
         None
-    else if not (isValidGameName game) then
+    elif not (isValidGameName game) then
         printfn
-            "Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
+            "Error: Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
             game
 
         None
@@ -158,7 +178,7 @@ let add (game: string) (path: string) (glob: string option) =
 
         Some { config with Games = newGames }
 
-let info (gameNames: string list option) (brief: bool) =
+let info (gameNames: string list option) (brief: bool) config =
     let games =
         match gameNames with
         | None -> config.Games
@@ -167,14 +187,7 @@ let info (gameNames: string list option) (brief: bool) =
     if brief then
         Seq.iter (fun g -> printfn "%s" g.Name) games
     else
-        Seq.iter
-            (fun g ->
-                printfn "Name: %s\nSave path: %s\n" g.Name g.Path
-
-                match g.Glob with
-                | None -> ()
-                | Some glob -> printfn "Save glob: %s\n\n" glob)
-            games
+        Seq.iter (fun g -> printGame g None None None) games
 
     None
 
@@ -187,7 +200,7 @@ let rec promptYorN prompt =
     | "n" -> false
     | _ -> promptYorN prompt
 
-let remove (games: string list) (yes: bool) =
+let remove (games: string list) (yes: bool) config =
     let newGames =
         Array.filter
             (fun g ->
@@ -202,11 +215,71 @@ let remove (games: string list) (yes: bool) =
 
     Some { config with Games = newGames }
 
-let edit (game: string) (newName: string option) (newPath: string option) (newGlob: string option) =
-    printfn $"{game} {newName} {newPath} {newGlob}"
-    Some config
+let edit (gameName: string) (newName: string option) (newPath: string option) (newGlob: string option) config =
+    let game =
+        Array.tryFind (fun g -> g.Name = gameName) config.Games
 
-let editConfig (path: string option) (frequency: int option) (numToKeep: int option) =
+    match (game, newName, newPath, newGlob) with
+    | (None, _, _, _) ->
+        printfn "Error: Game with the name %s doesn't exist" gameName
+        None
+    | (_, None, None, None) ->
+        printfn "Error: One or more of --name, --path, or --glob must be provided."
+        None
+    | (Some game, _, _, _) ->
+        let mSplitList =
+            Array.tryFindIndex (fun g -> g.Name = gameName) config.Games
+            |> Option.map (fun i -> Array.toList config.Games |> List.splitAt i)
+
+        match mSplitList with
+        | None ->
+            warnMissingGames [ gameName ] config
+            None
+        | Some (_, []) ->
+            printfn "Error: Couldn't find game in list"
+            None
+        | Some (front, game :: back) ->
+            let newName' = Option.defaultValue game.Name newName
+
+            let newGlob' =
+                match newGlob with
+                | Some "none" -> None
+                | Some "" -> None
+                | glob -> glob
+
+            let newPath' = Option.defaultValue game.Path newPath
+
+            let editedGame =
+                { game with
+                      Name = newName'
+                      Path = newPath'
+                      Glob = newGlob' }
+
+            if not (isValidGameName newName') then
+                printfn
+                    "Error: Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
+                    newName'
+
+                None
+            else
+                printGame game (Some newName') (Some newPath') newGlob'
+
+                let backupDirExists =
+                    Directory.Exists(Path.Join(config.Path, gameName))
+
+                if (Option.isSome newName && backupDirExists) then
+                    printfn "Warning: Game name changed, renaming backup directory..."
+                    Directory.Move(Path.Join(config.Path, gameName), Path.Join(config.Path, newName'))
+
+                Some
+                    { config with
+                          Games =
+                              List.concat [ front
+                                            List.singleton editedGame
+                                            back ]
+                              |> List.toArray }
+
+let editConfig (path: string option) (frequency: int option) (numToKeep: int option) config =
     printfn $"{path} {frequency} {numToKeep}"
     Some config
 
@@ -214,7 +287,13 @@ let parser =
     ArgumentParser.Create<SbuArgs>(programName = "sbu")
 
 let defaultConfigPath =
-    Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbufs", "config")
+    Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbufs", "config.json")
+
+let defaultConfig =
+    { Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbufs-backups")
+      Frequency = 15
+      NumToKeep = 20
+      Games = [||] }
 
 [<EntryPoint>]
 let main argv =
@@ -226,16 +305,16 @@ let main argv =
             result.TryGetResult Config_Path
             |> Option.defaultValue defaultConfigPath
 
-        config <-
+        let config =
             try
                 configPath
                 |> File.ReadAllText
                 |> JsonSerializer.Deserialize<Config>
             with e ->
                 printfn "Warning: %s Using default configuration." e.Message
-                config
+                defaultConfig
 
-        let newConfig =
+        let command =
             match result.GetSubCommand() with
             | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
             | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
@@ -245,7 +324,9 @@ let main argv =
                 edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
             | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
             | Config_Path _
-            | Version -> Some config
+            | Version -> Some
+
+        let newConfig = command config
 
         match newConfig with
         | None -> ()
