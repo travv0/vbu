@@ -119,7 +119,7 @@ type Config =
 let warnMissingGames games config =
     List.iter
         (fun gn ->
-            if (Array.exists (fun g -> g.Name = gn) config.Games) then
+            if not (Array.exists (fun g -> g.Name = gn) config.Games) then
                 printfn "Warning: No game named `%s'" gn)
         games
 
@@ -201,6 +201,8 @@ let rec promptYorN prompt =
     | _ -> promptYorN prompt
 
 let remove (games: string list) (yes: bool) config =
+    warnMissingGames games config
+
     let newGames =
         Array.filter
             (fun g ->
