@@ -1,8 +1,8 @@
 open Argu
 open DotNet.Globbing
-open System.Text.Json
 open System
 open System.IO
+open System.Text.Json
 open System.Threading
 
 type BackupArgs =
@@ -343,6 +343,15 @@ let validGameNameChars =
 let isValidGameName (name: string) =
     Array.TrueForAll(Array.ofSeq name, (fun c -> Array.contains c validGameNameChars))
 
+let absolutePath (path: string) =
+    if path.Length > 0 && path.[0] = '~' then
+        let home =
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+
+        Path.Join(home, path.[1..]) |> Path.GetFullPath
+    else
+        Path.GetFullPath path
+
 let add (game: string) (path: string) (glob: string option) config =
     if Seq.exists (fun g -> g.Name = game) config.Games then
         printfn "Error: Game with the name %s already exists" game
@@ -354,16 +363,19 @@ let add (game: string) (path: string) (glob: string option) config =
 
         None
     else
+        let newGame =
+            { Name = game
+              Path = absolutePath path
+              Glob = glob }
+
         let newGames =
-            Seq.singleton
-                { Name = game
-                  Path = path
-                  Glob = glob }
+            Seq.singleton newGame
             |> Seq.append config.Games
             |> Seq.sortBy (fun g -> g.Name)
             |> Seq.toArray
 
-        printfn "Successfully added %s" game
+        printfn "Successfully added %s\n" game
+        printGame newGame None None None
 
         Some { config with Games = newGames }
 
@@ -441,7 +453,7 @@ let edit (gameName: string) (newName: string option) (newPath: string option) (n
             let editedGame =
                 { game with
                       Name = newName'
-                      Path = newPath'
+                      Path = absolutePath newPath'
                       Glob = newGlob' }
 
             if not (isValidGameName newName') then
@@ -500,7 +512,7 @@ let editConfig backupDir backupFreq backupsToKeep config =
     | _ ->
         Some
             { config with
-                  Path = newBackupDir
+                  Path = absolutePath newBackupDir
                   Frequency = newBackupFreq
                   NumToKeep = newBackupsToKeep }
 
@@ -523,7 +535,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if result.Contains Version then
-            printfn "sbu v0.0.1"
+            printfn "sbu v0.0.2"
         else
             let configPath =
                 result.TryGetResult Config_Path
@@ -565,7 +577,6 @@ let main argv =
                 |> ignore
 
                 File.WriteAllText(configPath, JsonSerializer.Serialize(c))
-
     with e -> printfn "Error: %s" e.Message
 
     0
