@@ -279,9 +279,41 @@ let edit (gameName: string) (newName: string option) (newPath: string option) (n
                                             back ]
                               |> List.toArray }
 
-let editConfig (path: string option) (frequency: int option) (numToKeep: int option) config =
-    printfn $"{path} {frequency} {numToKeep}"
-    Some config
+let printConfig config newBackupDir newBackupFreq newBackupsToKeep =
+    printConfigRow "Backup path" config.Path newBackupDir
+
+    printConfigRow
+        "Backup frequency (in minutes)"
+        (config.Frequency.ToString())
+        (Option.map (fun freq -> freq.ToString()) newBackupFreq)
+
+    printConfigRow
+        "Number of backups to keep"
+        (config.NumToKeep.ToString())
+        (Option.map (fun toKeep -> toKeep.ToString()) newBackupsToKeep)
+
+    printfn ""
+
+let editConfig backupDir backupFreq backupsToKeep config =
+    let newBackupDir =
+        Option.defaultValue config.Path backupDir
+
+    let newBackupFreq =
+        Option.defaultValue config.Frequency backupFreq
+
+    let newBackupsToKeep =
+        Option.defaultValue config.NumToKeep backupsToKeep
+
+    printConfig config (Some newBackupDir) (Some newBackupFreq) (Some newBackupsToKeep)
+
+    match (backupDir, backupFreq, backupsToKeep) with
+    | (None, None, None) -> None
+    | _ ->
+        Some
+            { config with
+                  Path = newBackupDir
+                  Frequency = newBackupFreq
+                  NumToKeep = newBackupsToKeep }
 
 let parser =
     ArgumentParser.Create<SbuArgs>(programName = "sbu")
