@@ -121,11 +121,16 @@ type Config =
 let defaultGlob = "**/*"
 
 let warnMissingGames games config =
+    let mutable warningPrinted = false
+
     List.iter
         (fun gn ->
             if not (Array.exists (fun g -> g.Name = gn) config.Games) then
-                printfn "Warning: No game named `%s'" gn)
+                printfn "Warning: No game named `%s'" gn
+                warningPrinted <- true)
         games
+
+    if warningPrinted then printfn ""
 
 let printConfigRow label value newValue =
     printfn "%s: %s%s" label value
@@ -317,6 +322,10 @@ let add (game: string) (path: string) (glob: string option) config =
         Some { config with Games = newGames }
 
 let info (gameNames: string list option) (brief: bool) config =
+    match gameNames with
+    | Some gns -> warnMissingGames gns config
+    | None -> ()
+
     let games =
         match gameNames with
         | None -> config.Games
