@@ -1,7 +1,9 @@
 open Argu
+open DotNet.Globbing
 open System.Text.Json
 open System
 open System.IO
+open System.Threading
 
 type BackupArgs =
     | [<MainCommand>] Games of games: string list
@@ -116,6 +118,8 @@ type Config =
       NumToKeep: int
       Games: Game [] }
 
+let defaultGlob = "**/*"
+
 let warnMissingGames games config =
     List.iter
         (fun gn ->
@@ -142,9 +146,143 @@ let printGame game newName newPath newGlob =
 
     printfn ""
 
-let backup (games: string list option) (loop: bool) (verbose: bool) config =
-    printfn $"{games} {loop} {verbose}"
-    None
+let rec backupFile game basePath glob fromPath toPath =
+    try
+        let fromModTime = File.GetLastWriteTimeUtc(fromPath)
+
+        let globMatches () =
+            let glob =
+                Glob.Parse(Path.Join(basePath, Option.defaultValue defaultGlob glob))
+
+            glob.IsMatch(fromPath)
+
+        let copyAndCleanup () =
+            Directory.CreateDirectory(Directory.GetParent(toPath).FullName)
+            |> ignore
+
+            printfn "%s ==>\n\t%s" fromPath toPath
+            File.Copy(fromPath, toPath)
+            File.SetLastWriteTimeUtc(toPath, fromModTime)
+            // cleanupBackups toPath
+            (1, [||])
+
+        let backupFile' () =
+            let toModTime =
+                if File.Exists(toPath) then
+                    Some(File.GetLastWriteTimeUtc(toPath))
+                else
+                    None
+
+            match toModTime with
+            | Some toModTime ->
+                if fromModTime <> toModTime then
+                    File.Move(
+                        toPath,
+                        toPath
+                        + ".bak."
+                        + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
+                    )
+
+                    copyAndCleanup ()
+                else
+                    (0, [||])
+            | None -> copyAndCleanup ()
+
+        if Directory.Exists(fromPath) then
+            backupFiles game basePath glob fromPath toPath
+        else if globMatches () then
+            backupFile' ()
+        else
+            (0, [||])
+    with e ->
+        let warning =
+            sprintf "Unable to backup file %s for game %s:\n%s\n" toPath game e.Message
+
+        printfn "Warning: %s" warning
+        (1, [| warning |])
+
+and backupFiles game basePath glob fromPath toPath =
+    Directory.GetFileSystemEntries(fromPath)
+    |> Array.fold
+        (fun (c, es) path ->
+            let file = Path.GetFileName(path)
+
+            let (newCount, newErrs) =
+                backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file))
+
+            (c + newCount, Array.append es newErrs))
+        (0, [||])
+
+let backupGame gameName config =
+    let startTime = DateTime.Now
+
+    let game =
+        Array.tryFind (fun g -> g.Name = gameName) config.Games
+
+    match game with
+    | Some game ->
+        if Directory.Exists game.Path then
+            let (backedUpCount, warnings) =
+                backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName))
+
+            if (backedUpCount > 0) then
+                let now = DateTime.Now
+
+                printfn
+                    "\nFinished backing up %d file%s%s for %s in %fs on %s at %s\n"
+                    backedUpCount
+                    (if backedUpCount = 1 then "" else "s")
+                    (if warnings.Length > 0 then
+                         sprintf " with %d warning%s" warnings.Length (if warnings.Length = 1 then "" else "s")
+                     else
+                         "")
+                    gameName
+                    (now - startTime).TotalSeconds
+                    (now.ToLongDateString())
+                    (now.ToLongTimeString())
+
+            warnings
+        else
+            printfn "Warning: Path set for %s doesn't exist: %s" gameName game.Path
+            [||]
+    | None ->
+        warnMissingGames [ gameName ] config
+        [||]
+
+let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) config =
+    let gameNames' =
+        match gameNames with
+        | None -> Array.map (fun g -> g.Name) config.Games
+        | Some gns -> List.toArray gns
+
+    let warnings =
+        Array.fold
+            (fun acc game ->
+                let warnings =
+                    try
+                        backupGame game config
+                    with e ->
+                        printfn "Error backing up %s: %s" game e.Message
+                        [||]
+
+                Array.append acc warnings)
+            [||]
+            gameNames'
+
+    if not (Array.isEmpty warnings) then
+        printf "\n%d warning%s occurred:" warnings.Length (if warnings.Length = 1 then "" else "s")
+
+        if verbose then
+            printfn "\n"
+            Array.iter (printfn "%s") warnings
+        else
+            printfn "\nPass --verbose flag to print all warnings after backup completes\n"
+
+    if loop then
+        Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
+        backup gameNames loop verbose config
+    else
+        None
 
 let validGameNameChars =
     [ [| for c in 'A' .. 'z' -> c |]
@@ -329,40 +467,47 @@ let main argv =
         let result =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
-        let configPath =
-            result.TryGetResult Config_Path
-            |> Option.defaultValue defaultConfigPath
+        if result.Contains Version then
+            printfn "sbu v0.0.1"
+        else
+            let configPath =
+                result.TryGetResult Config_Path
+                |> Option.defaultValue defaultConfigPath
 
-        let config =
-            try
-                configPath
-                |> File.ReadAllText
-                |> JsonSerializer.Deserialize<Config>
-            with e ->
-                printfn "Warning: %s Using default configuration." e.Message
-                defaultConfig
+            let config =
+                try
+                    configPath
+                    |> File.ReadAllText
+                    |> JsonSerializer.Deserialize<Config>
+                with e ->
+                    printfn "Warning: %s Using default configuration." e.Message
+                    defaultConfig
 
-        let command =
-            match result.GetSubCommand() with
-            | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
-            | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
-            | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
-            | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
-            | Edit sp ->
-                edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
-            | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
-            | Config_Path _
-            | Version -> Some
+            let command =
+                match result.GetSubCommand() with
+                | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
+                | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
+                | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
+                | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
+                | Edit sp ->
+                    edit
+                        (sp.GetResult Game)
+                        (sp.TryGetResult Name)
+                        (sp.TryGetResult EditArgs.Path)
+                        (sp.TryGetResult Glob)
+                | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
+                | Config_Path _
+                | Version -> Some
 
-        let newConfig = command config
+            let newConfig = command config
 
-        match newConfig with
-        | None -> ()
-        | Some c ->
-            Directory.CreateDirectory(Directory.GetParent(configPath).FullName)
-            |> ignore
+            match newConfig with
+            | None -> ()
+            | Some c ->
+                Directory.CreateDirectory(Directory.GetParent(configPath).FullName)
+                |> ignore
 
-            File.WriteAllText(configPath, JsonSerializer.Serialize(c))
+                File.WriteAllText(configPath, JsonSerializer.Serialize(c))
 
     with e -> printfn "Error: %s" e.Message
 
