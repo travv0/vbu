@@ -492,8 +492,10 @@ let main argv =
                     printfn "Warning: %s Using default configuration." e.Message
                     defaultConfig
 
-            let command =
-                match result.GetSubCommand() with
+            let command = result.GetSubCommand()
+
+            let run =
+                match command with
                 | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
                 | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
                 | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
@@ -506,9 +508,9 @@ let main argv =
                         (sp.TryGetResult Glob)
                 | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
                 | Config_Path _
-                | Version -> Some
+                | Version -> failwithf "non-command matched as command: %s" (command.ToString())
 
-            let newConfig = command config
+            let newConfig = run config
 
             match newConfig with
             | None -> ()
