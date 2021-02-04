@@ -120,13 +120,25 @@ type Config =
 
 let defaultGlob = "**/*"
 
+let printWithColor color s =
+    Console.ForegroundColor <- color
+    printfn "%s" s
+    Console.ResetColor()
+
+let warn (s: string) =
+    "Warning: " + s
+    |> printWithColor ConsoleColor.Yellow
+
+let err (s: string) =
+    "Error: " + s |> printWithColor ConsoleColor.Red
+
 let warnMissingGames games config =
     let mutable warningPrinted = false
 
     Seq.iter
         (fun gn ->
             if not (Seq.exists (fun g -> g.Name = gn) config.Games) then
-                printfn "Warning: No game named `%s'" gn
+                warn $"No game named `{gn}'"
                 warningPrinted <- true)
         games
 
@@ -179,9 +191,7 @@ let cleanupBackups (backupPath: string) verbose config =
 
             Seq.iter
                 (fun f ->
-                    if verbose then
-                        printfn "Warning: Deleting %s" f
-
+                    if verbose then warn $"Deleting {f}"
                     File.Delete(f))
                 filesToDelete
 
@@ -236,7 +246,7 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
         let warning =
             sprintf "Unable to backup file %s for game %s:\n%s\n" toPath game e.Message
 
-        printfn "Warning: %s" warning
+        warn warning
         (1, Seq.singleton warning)
 
 and backupFiles game basePath glob fromPath toPath verbose config =
@@ -287,7 +297,7 @@ let backupGame gameName verbose config =
 
             warnings
         else
-            printfn "Warning: Path set for %s doesn't exist: %s" gameName game.Path
+            printfn $"Path set for {gameName} doesn't exist: {game.Path}"
             Seq.empty
     | None ->
         warnMissingGames [ gameName ] config
@@ -306,7 +316,7 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) conf
                     try
                         backupGame game verbose config
                     with e ->
-                        printfn "Error backing up %s: %s" game e.Message
+                        err $"Error backing up {game}: {e.Message}"
                         Seq.empty
 
                 Seq.append acc warnings)
@@ -354,12 +364,10 @@ let absolutePath (path: string) =
 
 let add (game: string) (path: string) (glob: string option) config =
     if Seq.exists (fun g -> g.Name = game) config.Games then
-        printfn "Error: Game with the name %s already exists" game
+        err $"Error: Game with the name {game} already exists"
         None
     elif not (isValidGameName game) then
-        printfn
-            "Error: Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
-            game
+        err "Invalid characters in name `{game}': only alphanumeric characters, underscores, and hyphens are allowed"
 
         None
     else
@@ -425,7 +433,7 @@ let remove (games: string list) (yes: bool) config =
 let edit (gameName: string) (newName: string option) (newPath: string option) (newGlob: string option) config =
     match (newName, newPath, newGlob) with
     | (None, None, None) ->
-        printfn "Error: One or more of --name, --path, or --glob must be provided."
+        err "One or more of --name, --path, or --glob must be provided."
         None
     | _ ->
         let splitList =
@@ -437,7 +445,7 @@ let edit (gameName: string) (newName: string option) (newPath: string option) (n
             warnMissingGames [ gameName ] config
             None
         | Some (_, []) ->
-            printfn "Error: Couldn't find game in list"
+            err "Couldn't find game in list"
             None
         | Some (front, game :: back) ->
             let newName' = Option.defaultValue game.Name newName
@@ -457,9 +465,8 @@ let edit (gameName: string) (newName: string option) (newPath: string option) (n
                       Glob = newGlob' }
 
             if not (isValidGameName newName') then
-                printfn
-                    "Error: Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
-                    newName'
+                err
+                    $"Invalid characters in name `{newName'}': only alphanumeric characters, underscores, and hyphens are allowed"
 
                 None
             else
@@ -469,7 +476,7 @@ let edit (gameName: string) (newName: string option) (newPath: string option) (n
                     Directory.Exists(Path.Join(config.Path, gameName))
 
                 if (Option.isSome newName && backupDirExists) then
-                    printfn "Warning: Game name changed, renaming backup directory..."
+                    warn "Game name changed, renaming backup directory..."
                     Directory.Move(Path.Join(config.Path, gameName), Path.Join(config.Path, newName'))
 
                 Some
@@ -535,7 +542,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if result.Contains Version then
-            printfn "sbu v0.0.2"
+            printfn "sbu v0.0.3"
         else
             let configPath =
                 result.TryGetResult Config_Path
@@ -547,7 +554,7 @@ let main argv =
                     |> File.ReadAllText
                     |> JsonSerializer.Deserialize<Config>
                 with e ->
-                    printfn "Warning: %s Using default configuration." e.Message
+                    printfn $"{e.Message} Using default configuration."
                     defaultConfig
 
             let command = result.GetSubCommand()
@@ -577,6 +584,8 @@ let main argv =
                 |> ignore
 
                 File.WriteAllText(configPath, JsonSerializer.Serialize(c))
-    with e -> printfn "Error: %s" e.Message
+    with
+    | :? Argu.ArguParseException as e -> printfn "%s" e.Message
+    | e -> err e.Message
 
     0
