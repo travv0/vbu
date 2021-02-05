@@ -534,6 +534,12 @@ let defaultConfig =
       NumToKeep = 20
       Games = [||] }
 
+let saveDefaultConfig path =
+    Directory.CreateDirectory(Path.GetDirectoryName(path: string))
+    |> ignore
+
+    File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
+
 [<EntryPoint>]
 let main argv =
     try
@@ -541,11 +547,14 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if result.Contains Version then
-            printfn "sbu v0.0.4"
+            printfn "sbu v0.0.5"
         else
             let configPath =
                 result.TryGetResult Config_Path
                 |> Option.defaultValue defaultConfigPath
+
+            if not (File.Exists(configPath)) then
+                saveDefaultConfig configPath
 
             let config =
                 try
@@ -553,7 +562,14 @@ let main argv =
                     |> File.ReadAllText
                     |> JsonSerializer.Deserialize<Config>
                 with e ->
-                    warn $"{e.Message} Using default configuration."
+                    warn
+                        $"Couldn't load config: {e.Message}\nAttempting to save default config \
+                        to '{configPath}' after backing up existing config.\n"
+
+                    if File.Exists(configPath) then
+                        File.Copy(configPath, configPath + ".bak", true)
+
+                    saveDefaultConfig configPath
                     defaultConfig
 
             let command = result.GetSubCommand()
