@@ -585,11 +585,11 @@ let saveDefaultConfig path =
 
     File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
 
-let runApp (parseResults: ParseResults<_>) (configPath: string): App<unit> =
+let app (parseResults: ParseResults<_>): App<Config option> =
     monad {
         let command = parseResults.GetSubCommand()
 
-        let! newConfig =
+        return!
             match command with
             | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
             | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
@@ -600,27 +600,21 @@ let runApp (parseResults: ParseResults<_>) (configPath: string): App<unit> =
             | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
             | Config_Path _
             | Version -> failwithf "non-command matched as command: %s" (command.ToString())
-
-        match newConfig with
-        | None -> ()
-        | Some c ->
-            Directory.CreateDirectory(Path.GetDirectoryName(configPath))
-            |> ignore
-
-            File.WriteAllText(configPath, JsonSerializer.Serialize(c))
     }
+
+let runApp = Reader.run << app
 
 [<EntryPoint>]
 let main argv =
     try
-        let result =
+        let parseResults =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
-        if result.Contains Version then
+        if parseResults.Contains Version then
             printfn "sbu v0.0.7"
         else
             let configPath =
-                result.TryGetResult Config_Path
+                parseResults.TryGetResult Config_Path
                 |> Option.defaultValue defaultConfigPath
 
             if not (File.Exists(configPath)) then
@@ -645,8 +639,15 @@ let main argv =
                     saveDefaultConfig configPath
                     defaultConfig
 
-            Reader.run (runApp result configPath) config
+            let newConfig = runApp parseResults config
 
+            match newConfig with
+            | None -> ()
+            | Some c ->
+                Directory.CreateDirectory(Path.GetDirectoryName(configPath))
+                |> ignore
+
+                File.WriteAllText(configPath, JsonSerializer.Serialize(c))
     with
     | :? Argu.ArguParseException as e -> printfn "%s" e.Message
     | e -> err e.Message
