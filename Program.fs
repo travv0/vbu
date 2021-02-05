@@ -1,5 +1,7 @@
 open Argu
 open DotNet.Globbing
+open FSharpPlus
+open FSharpPlus.Data
 open System
 open System.IO
 open System.Text.Json
@@ -136,15 +138,18 @@ let warn (s: string) =
 let err (s: string) =
     "Error: " + s |> printWithColor ConsoleColor.Red
 
-let warnMissingGames games config =
-    let mutable warningPrinted = false
+let warnMissingGames games =
+    monad {
+        let! config = ask
+        let mutable warningPrinted = false
 
-    for game in games do
-        if not (Seq.exists (fun g -> g.Name = game) config.Games) then
-            warn $"No game named `{game}'"
-            warningPrinted <- true
+        for game in games do
+            if not (exists (fun g -> g.Name = game) config.Games) then
+                warn $"No game named `{game}'"
+                warningPrinted <- true
 
-    if warningPrinted then printfn ""
+        if warningPrinted then printfn ""
+    }
 
 let printConfigRow label value newValue =
     printfn "%s: %s%s" label value
@@ -165,179 +170,196 @@ let printGame game newName newPath newGlob =
 
     printfn ""
 
-let cleanupBackups (backupPath: string) verbose config =
-    if config.NumToKeep > 0 then
-        let glob =
-            Glob.Parse(
-                backupPath
-                + ".bak.[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]"
-            )
+let cleanupBackups (backupPath: string) verbose =
+    monad {
+        let! config = ask
 
-        let allFiles =
-            Directory.EnumerateFiles(Path.GetDirectoryName(backupPath))
-
-        let files =
-            Seq.filter (fun f -> glob.IsMatch(f: string)) allFiles
-            |> Seq.append (Seq.singleton backupPath)
-
-        if (Seq.length files > config.NumToKeep) then
-            let sortedFiles =
-                Seq.sortWith (fun f1 f2 -> compare (File.GetLastWriteTimeUtc f2) (File.GetLastWriteTimeUtc f1)) files
-
-            let filesToDelete = Seq.skip config.NumToKeep sortedFiles
-
-            for file in filesToDelete do
-                if verbose then warn $"Deleting {file}"
-                File.Delete(file)
-
-let rec backupFile game basePath glob fromPath toPath verbose config =
-    try
-        let globMatches () =
+        if config.NumToKeep > 0 then
             let glob =
-                Glob.Parse(Path.Join(basePath, Option.defaultValue defaultGlob glob))
+                Glob.Parse(
+                    backupPath
+                    + ".bak.[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]"
+                )
 
-            glob.IsMatch(fromPath: string)
+            let allFiles =
+                Directory.EnumerateFiles(Path.GetDirectoryName(backupPath))
 
-        let copyAndCleanup () =
-            Directory.CreateDirectory(Path.GetDirectoryName(toPath: string))
-            |> ignore
+            let files =
+                filter (fun f -> glob.IsMatch(f: string)) allFiles
+                |> plus (result backupPath)
 
-            printfn "%s ==>\n\t%s" fromPath toPath
-            File.Copy(fromPath, toPath)
-            cleanupBackups toPath verbose config
-            (1, Seq.empty)
+            if (length files > config.NumToKeep) then
+                let sortedFiles =
+                    sortByDescending File.GetLastWriteTimeUtc files
 
-        let backupFile' () =
-            let fromModTime = File.GetLastWriteTimeUtc(fromPath)
+                let filesToDelete = skip config.NumToKeep sortedFiles
 
-            let toModTime =
-                if File.Exists(toPath) then
-                    Some(File.GetLastWriteTimeUtc(toPath))
-                else
-                    None
+                for file in filesToDelete do
+                    if verbose then warn $"Deleting {file}"
+                    File.Delete(file)
+    }
 
-            match toModTime with
-            | Some toModTime ->
-                if fromModTime <> toModTime then
-                    File.Move(
-                        toPath,
-                        toPath
-                        + ".bak."
-                        + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
-                    )
+let rec backupFile game basePath glob fromPath toPath verbose =
+    try
+        monad {
+            let globMatches () =
+                let glob =
+                    Glob.Parse(Path.Join(basePath, Option.defaultValue defaultGlob glob))
 
-                    copyAndCleanup ()
-                else
-                    (0, Seq.empty)
-            | None -> copyAndCleanup ()
+                glob.IsMatch(fromPath: string)
 
-        if Directory.Exists(fromPath) then
-            backupFiles game basePath glob fromPath toPath verbose config
-        else if globMatches () then
-            backupFile' ()
-        else
-            (0, Seq.empty)
+            let copyAndCleanup () =
+                monad {
+                    Directory.CreateDirectory(Path.GetDirectoryName(toPath: string))
+                    |> ignore
+
+                    printfn "%s ==>\n\t%s" fromPath toPath
+                    File.Copy(fromPath, toPath)
+                    do! cleanupBackups toPath verbose
+                    return (1, empty)
+                }
+
+            let backupFile' () =
+                monad {
+                    let fromModTime = File.GetLastWriteTimeUtc(fromPath)
+
+                    let toModTime =
+                        if File.Exists(toPath) then
+                            Some(File.GetLastWriteTimeUtc(toPath))
+                        else
+                            None
+
+                    match toModTime with
+                    | Some toModTime ->
+                        if fromModTime <> toModTime then
+                            File.Move(
+                                toPath,
+                                toPath
+                                + ".bak."
+                                + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
+                            )
+
+                            return! copyAndCleanup ()
+                        else
+                            return (0, empty)
+                    | None -> return! copyAndCleanup ()
+                }
+
+            if Directory.Exists(fromPath) then
+                return! backupFiles game basePath glob fromPath toPath verbose
+            else if globMatches () then
+                return! backupFile' ()
+            else
+                return (0, empty)
+        }
     with e ->
-        let warning =
-            sprintf "Unable to backup file %s for game %s:\n%s\n" toPath game e.Message
+        monad {
+            let warning =
+                sprintf "Unable to backup file %s for game %s:\n%s\n" toPath game e.Message
 
-        warn warning
-        (1, Seq.singleton warning)
-
-and backupFiles game basePath glob fromPath toPath verbose config =
-    Directory.EnumerateFileSystemEntries(fromPath)
-    |> Seq.fold
-        (fun (c, es) path ->
-            let file = Path.GetFileName(path)
-
-            let (newCount, newErrs) =
-                backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file)) verbose config
-
-            (c + newCount, Seq.append es newErrs))
-        (0, Seq.empty)
-
-let backupGame gameName verbose config =
-    let startTime = DateTime.Now
-
-    let game =
-        Seq.tryFind (fun g -> g.Name = gameName) config.Games
-
-    match game with
-    | Some game ->
-        if Directory.Exists game.Path then
-            let (backedUpCount, warnings) =
-                backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName)) verbose config
-
-            if (backedUpCount > 0) then
-                let now = DateTime.Now
-
-                printfn
-                    "\nFinished backing up %d file%s%s for %s in %fs on %s at %s\n"
-                    backedUpCount
-                    (if backedUpCount = 1 then "" else "s")
-                    (if Seq.length warnings > 0 then
-                         sprintf
-                             " with %d warning%s"
-                             (Seq.length warnings)
-                             (if Seq.length warnings = 1 then
-                                  ""
-                              else
-                                  "s")
-                     else
-                         "")
-                    gameName
-                    (now - startTime).TotalSeconds
-                    (now.ToLongDateString())
-                    (now.ToLongTimeString())
-
-            warnings
-        else
-            warn $"Path set for {gameName} doesn't exist: {game.Path}"
-            Seq.empty
-    | None ->
-        warnMissingGames [ gameName ] config
-        Seq.empty
-
-let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) config =
-    let gameNames' =
-        match gameNames with
-        | None -> Seq.map (fun g -> g.Name) config.Games
-        | Some gns -> List.toSeq gns
-
-    let warnings =
-        seq {
-            for game in gameNames' do
-                yield!
-                    try
-                        backupGame game verbose config
-                    with e ->
-                        err $"Error backing up {game}: {e.Message}"
-                        Seq.empty
+            warn warning
+            return (1, result warning)
         }
 
-    if not (Seq.isEmpty warnings) then
-        withColor
-            ConsoleColor.Yellow
-            (fun () ->
-                printf
-                    "\n%d warning%s occurred:"
-                    (Seq.length warnings)
-                    (if Seq.length warnings = 1 then
-                         ""
-                     else
-                         "s")
+and backupFiles game basePath glob fromPath toPath verbose =
+    monad {
+        return!
+            Directory.EnumerateFileSystemEntries(fromPath)
+            |> toList
+            |> List.foldM
+                (fun (c, es) path ->
+                    monad {
+                        let file = Path.GetFileName(path)
 
-                if verbose then
-                    printfn "\n"
-                    Seq.iter (printfn "%s") warnings
-                else
-                    printfn "\nPass --verbose flag to print all warnings after backup completes\n")
+                        let! (newCount, newErrs) =
+                            backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file)) verbose
 
-    if loop then
-        Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
-        backup gameNames loop verbose config
-    else
-        None
+                        return (c + newCount, Seq.append es newErrs)
+                    })
+                (0, Seq.empty)
+    }
+
+let backupGame gameName verbose =
+    monad {
+        let! config = ask
+        let startTime = DateTime.Now
+
+        let game =
+            tryFind (fun g -> g.Name = gameName) config.Games
+
+        match game with
+        | Some game ->
+            if Directory.Exists game.Path then
+                let! (backedUpCount, warnings) =
+                    backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName)) verbose
+
+                if (backedUpCount > 0) then
+                    let now = DateTime.Now
+
+                    printfn
+                        "\nFinished backing up %d file%s%s for %s in %fs on %s at %s\n"
+                        backedUpCount
+                        (if backedUpCount = 1 then "" else "s")
+                        (if length warnings > 0 then
+                             sprintf " with %d warning%s" (length warnings) (if length warnings = 1 then "" else "s")
+                         else
+                             "")
+                        gameName
+                        (now - startTime).TotalSeconds
+                        (now.ToLongDateString())
+                        (now.ToLongTimeString())
+
+                return warnings
+            else
+                warn $"Path set for {gameName} doesn't exist: {game.Path}"
+                return empty
+        | None ->
+            do! warnMissingGames (result gameName)
+            return empty
+    }
+
+let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) =
+    monad {
+        let! config = ask
+
+        let gameNames' =
+            match gameNames with
+            | None -> map (fun g -> g.Name) config.Games
+            | Some gns -> toArray gns
+
+        let! warnings =
+            gameNames'
+            |> toList
+            |> List.foldM
+                (fun acc game ->
+                    monad.strict {
+                        try
+                            let! warnings = backupGame game verbose
+                            return acc ++ warnings
+                        with e ->
+                            err $"Error backing up {game}: {e.Message}"
+                            return acc
+                    })
+                empty
+
+        if length warnings > 0 then
+            withColor
+                ConsoleColor.Yellow
+                (fun () ->
+                    printf "\n%d warning%s occurred:" (length warnings) (if length warnings = 1 then "" else "s")
+
+                    if verbose then
+                        printfn "\n"
+                        iter (printfn "%s") warnings
+                    else
+                        printfn "\nPass --verbose flag to print all warnings after backup completes\n")
+
+        if loop then
+            Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
+            return! backup gameNames loop verbose
+        else
+            return None
+    }
 
 let validGameNameChars =
     [| yield! [| for c in 'A' .. 'Z' -> c |]
@@ -346,7 +368,7 @@ let validGameNameChars =
        yield! [| '-'; '_' |] |]
 
 let isValidGameName (name: string) =
-    Array.TrueForAll(Array.ofSeq name, (fun c -> Array.contains c validGameNameChars))
+    forall (fun c -> Array.contains c validGameNameChars) (Array.ofSeq name)
 
 let absolutePath (path: string) =
     if path.Length > 0 && path.[0] = '~' then
@@ -357,47 +379,56 @@ let absolutePath (path: string) =
     else
         Path.GetFullPath path
 
-let add (game: string) (path: string) (glob: string option) config =
-    if Seq.exists (fun g -> g.Name = game) config.Games then
-        err $"Error: Game with the name {game} already exists"
-        None
-    elif not (isValidGameName game) then
-        err "Invalid characters in name `{game}': only alphanumeric characters, underscores, and hyphens are allowed"
+let add (game: string) (path: string) (glob: string option) =
+    monad {
+        let! config = ask
 
-        None
-    else
-        let newGame =
-            { Name = game
-              Path = absolutePath path
-              Glob = glob }
+        if exists (fun g -> g.Name = game) config.Games then
+            err $"Error: Game with the name {game} already exists"
+            return None
+        elif not (isValidGameName game) then
+            err
+                "Invalid characters in name `{game}': only alphanumeric characters, underscores, and hyphens are allowed"
 
-        let newGames =
-            Seq.singleton newGame
-            |> Seq.append config.Games
-            |> Seq.sortBy (fun g -> g.Name)
-            |> Seq.toArray
+            return None
+        else
+            let newGame =
+                { Name = game
+                  Path = absolutePath path
+                  Glob = glob }
 
-        printfn "Successfully added %s\n" game
-        printGame newGame None None None
+            let newGames =
+                result newGame
+                |> plus config.Games
+                |> sortBy (fun g -> g.Name)
+                |> toArray
 
-        Some { config with Games = newGames }
+            printfn "Successfully added %s\n" game
+            printGame newGame None None None
 
-let info (gameNames: string list option) (brief: bool) config =
-    match gameNames with
-    | Some gns -> warnMissingGames gns config
-    | None -> ()
+            return Some { config with Games = newGames }
+    }
 
-    let games =
+let info (gameNames: string list option) (brief: bool) =
+    monad {
+        let! config = ask
+
         match gameNames with
-        | None -> Array.toSeq config.Games
-        | Some gs -> Seq.filter (fun g -> Seq.contains g.Name gs) config.Games
+        | Some gns -> do! warnMissingGames gns
+        | None -> ()
 
-    if brief then
-        Seq.iter (fun g -> printfn "%s" g.Name) games
-    else
-        Seq.iter (fun g -> printGame g None None None) games
+        let games =
+            match gameNames with
+            | None -> config.Games
+            | Some gs -> filter (fun g -> List.contains g.Name gs) config.Games
 
-    None
+        if brief then
+            iter (fun g -> printfn "%s" g.Name) games
+        else
+            iter (fun g -> printGame g None None None) games
+
+        return None
+    }
 
 let rec promptYorN prompt =
     stdout.Flush()
@@ -408,116 +439,128 @@ let rec promptYorN prompt =
     | "n" -> false
     | _ -> promptYorN prompt
 
-let remove (games: string list) (yes: bool) config =
-    warnMissingGames games config
+let remove (games: string list) (yes: bool) =
+    monad {
+        let! config = ask
+        do! warnMissingGames games
 
-    let newGames =
-        [| for game in config.Games do
-            if Seq.contains game.Name games
-               && (yes
-                   || promptYorN (
-                       "Are you sure you want to remove "
-                       + game.Name
-                       + "?"
-                   )) then
-                printfn "Removed %s" game.Name
-            else
-                yield game |]
+        let newGames =
+            [| for game in config.Games do
+                   if List.contains game.Name games
+                      && (yes
+                          || promptYorN (
+                              "Are you sure you want to remove "
+                              + game.Name
+                              + "?"
+                          )) then
+                       printfn "Removed %s" game.Name
+                   else
+                       yield game |]
 
-    Some { config with Games = newGames }
+        return Some { config with Games = newGames }
+    }
 
-let edit (gameName: string) (newName: string option) (newPath: string option) (newGlob: string option) config =
-    match (newName, newPath, newGlob) with
-    | (None, None, None) ->
-        err "One or more of --name, --path, or --glob must be provided."
-        None
-    | _ ->
-        let splitList =
-            Seq.tryFindIndex (fun g -> g.Name = gameName) config.Games
-            |> Option.map (fun i -> Seq.toList config.Games |> List.splitAt i)
+let edit (gameName: string) (newName: string option) (newPath: string option) (newGlob: string option) =
+    monad {
+        let! config = ask
 
-        match splitList with
-        | None ->
-            warnMissingGames [ gameName ] config
-            None
-        | Some (_, []) ->
-            err "Couldn't find game in list"
-            None
-        | Some (front, game :: back) ->
-            let newName' = Option.defaultValue game.Name newName
+        match (newName, newPath, newGlob) with
+        | (None, None, None) ->
+            err "One or more of --name, --path, or --glob must be provided."
+            return None
+        | _ ->
+            let splitList =
+                tryFindIndex (fun g -> g.Name = gameName) config.Games
+                |> Option.map (fun i -> toList config.Games |> List.splitAt i)
 
-            let newGlob' =
-                match newGlob with
-                | Some "none" -> None
-                | Some "" -> None
-                | glob -> glob
+            match splitList with
+            | None ->
+                do! warnMissingGames [ gameName ]
+                return None
+            | Some (_, []) ->
+                err "Couldn't find game in list"
+                return None
+            | Some (front, game :: back) ->
+                let newName' = Option.defaultValue game.Name newName
 
-            let newPath' = Option.defaultValue game.Path newPath
+                let newGlob' =
+                    match newGlob with
+                    | Some "none" -> None
+                    | Some "" -> None
+                    | glob -> glob
 
-            let editedGame =
-                { game with
-                      Name = newName'
-                      Path = absolutePath newPath'
-                      Glob = newGlob' }
+                let newPath' = Option.defaultValue game.Path newPath
 
-            if not (isValidGameName newName') then
-                err
-                    $"Invalid characters in name `{newName'}': only alphanumeric characters, underscores, and hyphens are allowed"
+                let editedGame =
+                    { game with
+                          Name = newName'
+                          Path = absolutePath newPath'
+                          Glob = newGlob' }
 
-                None
-            else
-                printGame game (Some newName') (Some newPath') newGlob'
+                if not (isValidGameName newName') then
+                    err
+                        $"Invalid characters in name `{newName'}': only alphanumeric characters, underscores, and hyphens are allowed"
 
-                let backupDirExists =
-                    Directory.Exists(Path.Join(config.Path, gameName))
+                    return None
+                else
+                    printGame game (Some newName') (Some newPath') newGlob'
 
-                if (Option.isSome newName && backupDirExists) then
-                    warn "Game name changed, renaming backup directory..."
-                    Directory.Move(Path.Join(config.Path, gameName), Path.Join(config.Path, newName'))
+                    let backupDirExists =
+                        Directory.Exists(Path.Join(config.Path, gameName))
 
+                    if (Option.isSome newName && backupDirExists) then
+                        warn "Game name changed, renaming backup directory..."
+                        Directory.Move(Path.Join(config.Path, gameName), Path.Join(config.Path, newName'))
+
+                    return
+                        Some
+                            { config with
+                                  Games = front ++ result editedGame ++ back |> toArray }
+    }
+
+let printConfig newBackupDir newBackupFreq newBackupsToKeep =
+    monad {
+        let! config = ask
+        printConfigRow "Backup path" config.Path newBackupDir
+
+        printConfigRow
+            "Backup frequency (in minutes)"
+            (config.Frequency.ToString())
+            (Option.map (fun freq -> freq.ToString()) newBackupFreq)
+
+        printConfigRow
+            "Number of backups to keep"
+            (config.NumToKeep.ToString())
+            (Option.map (fun toKeep -> toKeep.ToString()) newBackupsToKeep)
+
+        printfn ""
+    }
+
+let editConfig backupDir backupFreq backupsToKeep =
+    monad {
+        let! config = ask
+
+        let newBackupDir =
+            Option.defaultValue config.Path backupDir
+
+        let newBackupFreq =
+            Option.defaultValue config.Frequency backupFreq
+
+        let newBackupsToKeep =
+            Option.defaultValue config.NumToKeep backupsToKeep
+
+        do! printConfig (Some newBackupDir) (Some newBackupFreq) (Some newBackupsToKeep)
+
+        match (backupDir, backupFreq, backupsToKeep) with
+        | (None, None, None) -> return None
+        | _ ->
+            return
                 Some
                     { config with
-                          Games =
-                              Seq.concat [ front
-                                           List.singleton editedGame
-                                           back ]
-                              |> Seq.toArray }
-
-let printConfig config newBackupDir newBackupFreq newBackupsToKeep =
-    printConfigRow "Backup path" config.Path newBackupDir
-
-    printConfigRow
-        "Backup frequency (in minutes)"
-        (config.Frequency.ToString())
-        (Option.map (fun freq -> freq.ToString()) newBackupFreq)
-
-    printConfigRow
-        "Number of backups to keep"
-        (config.NumToKeep.ToString())
-        (Option.map (fun toKeep -> toKeep.ToString()) newBackupsToKeep)
-
-    printfn ""
-
-let editConfig backupDir backupFreq backupsToKeep config =
-    let newBackupDir =
-        Option.defaultValue config.Path backupDir
-
-    let newBackupFreq =
-        Option.defaultValue config.Frequency backupFreq
-
-    let newBackupsToKeep =
-        Option.defaultValue config.NumToKeep backupsToKeep
-
-    printConfig config (Some newBackupDir) (Some newBackupFreq) (Some newBackupsToKeep)
-
-    match (backupDir, backupFreq, backupsToKeep) with
-    | (None, None, None) -> None
-    | _ ->
-        Some
-            { config with
-                  Path = absolutePath newBackupDir
-                  Frequency = newBackupFreq
-                  NumToKeep = newBackupsToKeep }
+                          Path = absolutePath newBackupDir
+                          Frequency = newBackupFreq
+                          NumToKeep = newBackupsToKeep }
+    }
 
 let parser =
     ArgumentParser.Create<SbuArgs>(programName = "sbu")
@@ -536,6 +579,31 @@ let saveDefaultConfig path =
     |> ignore
 
     File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
+
+let runApp (parseResults: ParseResults<_>) (configPath: string) =
+    monad {
+        let command = parseResults.GetSubCommand()
+
+        let! newConfig =
+            match command with
+            | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
+            | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
+            | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
+            | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
+            | Edit sp ->
+                edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
+            | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
+            | Config_Path _
+            | Version -> failwithf "non-command matched as command: %s" (command.ToString())
+
+        match newConfig with
+        | None -> ()
+        | Some c ->
+            Directory.CreateDirectory(Path.GetDirectoryName(configPath))
+            |> ignore
+
+            File.WriteAllText(configPath, JsonSerializer.Serialize(c))
+    }
 
 [<EntryPoint>]
 let main argv =
@@ -559,9 +627,12 @@ let main argv =
                     |> File.ReadAllText
                     |> JsonSerializer.Deserialize<Config>
                 with e ->
-                    warn
-                        $"Couldn't load config: {e.Message}\nAttempting to save default config \
-                        to '{configPath}' after backing up existing config.\n"
+                    sprintf
+                        "Couldn't load config: %s\nAttempting to save default config \
+                        to '%s' after backing up existing config.\n"
+                        e.Message
+                        configPath
+                    |> warn
 
                     if File.Exists(configPath) then
                         File.Copy(configPath, configPath + ".bak", true)
@@ -569,33 +640,8 @@ let main argv =
                     saveDefaultConfig configPath
                     defaultConfig
 
-            let command = result.GetSubCommand()
+            Reader.run (runApp result configPath) config
 
-            let run =
-                match command with
-                | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
-                | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
-                | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
-                | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
-                | Edit sp ->
-                    edit
-                        (sp.GetResult Game)
-                        (sp.TryGetResult Name)
-                        (sp.TryGetResult EditArgs.Path)
-                        (sp.TryGetResult Glob)
-                | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
-                | Config_Path _
-                | Version -> failwithf "non-command matched as command: %s" (command.ToString())
-
-            let newConfig = run config
-
-            match newConfig with
-            | None -> ()
-            | Some c ->
-                Directory.CreateDirectory(Path.GetDirectoryName(configPath))
-                |> ignore
-
-                File.WriteAllText(configPath, JsonSerializer.Serialize(c))
     with
     | :? Argu.ArguParseException as e -> printfn "%s" e.Message
     | e -> err e.Message
