@@ -370,10 +370,10 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) =
     }
 
 let validGameNameChars =
-    [| yield! [| for c in 'A' .. 'Z' -> c |]
-       yield! [| for c in 'a' .. 'z' -> c |]
-       yield! [| for c in '0' .. '9' -> c |]
-       yield! [| '-'; '_' |] |]
+    Array.concat [ [| 'A' .. 'Z' |]
+                   [| 'a' .. 'z' |]
+                   [| '0' .. '9' |]
+                   [| '-'; '_' |] ]
 
 let isValidGameName (name: string) =
     Array.TrueForAll(Array.ofSeq name, (fun c -> Array.contains c validGameNameChars))
