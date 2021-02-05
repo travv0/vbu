@@ -305,18 +305,15 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) conf
         | Some gns -> List.toSeq gns
 
     let warnings =
-        Seq.fold
-            (fun acc game ->
-                let warnings =
+        seq {
+            for game in gameNames' do
+                yield!
                     try
                         backupGame game verbose config
                     with e ->
                         err $"Error backing up {game}: {e.Message}"
                         Seq.empty
-
-                Seq.append acc warnings)
-            Seq.empty
-            gameNames'
+        }
 
     if not (Seq.isEmpty warnings) then
         withColor
@@ -343,10 +340,10 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) conf
         None
 
 let validGameNameChars =
-    [ [| for c in 'A' .. 'z' -> c |]
-      [| for c in '0' .. '9' -> c |]
-      [| '-'; '_' |] ]
-    |> Array.concat
+    [| yield! [| for c in 'A' .. 'Z' -> c |]
+       yield! [| for c in 'a' .. 'z' -> c |]
+       yield! [| for c in '0' .. '9' -> c |]
+       yield! [| '-'; '_' |] |]
 
 let isValidGameName (name: string) =
     Array.TrueForAll(Array.ofSeq name, (fun c -> Array.contains c validGameNameChars))
