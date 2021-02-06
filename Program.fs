@@ -494,12 +494,14 @@ let edit
                     | Some "" -> None
                     | glob -> glob
 
-                let newPath' = Option.defaultValue game.Path newPath
+                let newPath' =
+                    Option.defaultValue game.Path newPath
+                    |> absolutePath
 
                 let editedGame =
                     { game with
                           Name = newName'
-                          Path = absolutePath newPath'
+                          Path = newPath'
                           Glob = newGlob' }
 
                 if not (isValidGameName newName') then
@@ -547,6 +549,7 @@ let editConfig backupDir backupFreq backupsToKeep: App<Config option> =
 
         let newBackupDir =
             Option.defaultValue config.Path backupDir
+            |> absolutePath
 
         let newBackupFreq =
             Option.defaultValue config.Frequency backupFreq
@@ -562,7 +565,7 @@ let editConfig backupDir backupFreq backupsToKeep: App<Config option> =
             return
                 Some
                     { config with
-                          Path = absolutePath newBackupDir
+                          Path = newBackupDir
                           Frequency = newBackupFreq
                           NumToKeep = newBackupsToKeep }
     }
@@ -611,7 +614,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v0.0.7"
+            printfn "sbu v0.0.8"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
