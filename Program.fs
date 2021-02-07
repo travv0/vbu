@@ -143,12 +143,17 @@ let err s =
 let warnMissingGames games: App<unit> =
     monad {
         let! config = ask
-        let mutable warningPrinted = false
 
-        for game in games do
-            if not (exists (fun g -> g.Name = game) config.Games) then
-                warn $"No game named `{game}'"
-                warningPrinted <- true
+        let warningPrinted =
+            fold
+                (fun warningPrinted game ->
+                    if not (exists (fun g -> g.Name = game) config.Games) then
+                        warn $"No game named `{game}'"
+                        true
+                    else
+                        warningPrinted)
+                false
+                games
 
         if warningPrinted then printfn ""
     }
@@ -580,7 +585,7 @@ let defaultConfig =
     { Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbufs-backups")
       Frequency = 15
       NumToKeep = 20
-      Games = [||] }
+      Games = empty }
 
 let saveDefaultConfig path =
     Directory.CreateDirectory(Path.GetDirectoryName(path: string))
