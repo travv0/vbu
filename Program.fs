@@ -1,3 +1,5 @@
+module Program
+
 open Argu
 open DotNet.Globbing
 open FSharpPlus
@@ -599,8 +601,9 @@ let defaultConfig =
       Games = empty }
 
 let saveDefaultConfig path =
-    Directory.CreateDirectory(Path.GetDirectoryName(path: string))
-    |> ignore
+    match Path.GetDirectoryName(path: string) with
+    | "" -> ()
+    | path -> Directory.CreateDirectory(path) |> ignore
 
     File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
 
@@ -622,6 +625,28 @@ let app (parseResults: ParseResults<_>): App<Config option> =
             | Version -> failwithf "non-command matched as command: %s" (command.ToString())
     }
 
+let loadConfig configPath =
+    if not (File.Exists(configPath)) then
+        saveDefaultConfig configPath
+
+    try
+        configPath
+        |> File.ReadAllText
+        |> JsonSerializer.Deserialize<Config>
+    with e ->
+        sprintf
+            "Couldn't load config: %s\nAttempting to save default config \
+                    to '%s' after backing up existing config.\n"
+            e.Message
+            configPath
+        |> warn
+
+        if File.Exists(configPath) then
+            File.Copy(configPath, configPath + ".bak", true)
+
+        saveDefaultConfig configPath
+        defaultConfig
+
 let runApp = Reader.run << app
 
 [<EntryPoint>]
@@ -637,28 +662,7 @@ let main argv =
                 parseResults.TryGetResult Config_Path
                 |> Option.defaultValue defaultConfigPath
 
-            if not (File.Exists(configPath)) then
-                saveDefaultConfig configPath
-
-            let config =
-                try
-                    configPath
-                    |> File.ReadAllText
-                    |> JsonSerializer.Deserialize<Config>
-                with e ->
-                    sprintf
-                        "Couldn't load config: %s\nAttempting to save default config \
-                        to '%s' after backing up existing config.\n"
-                        e.Message
-                        configPath
-                    |> warn
-
-                    if File.Exists(configPath) then
-                        File.Copy(configPath, configPath + ".bak", true)
-
-                    saveDefaultConfig configPath
-                    defaultConfig
-
+            let config = loadConfig configPath
             let newConfig = runApp parseResults config
 
             match newConfig with
