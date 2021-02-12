@@ -47,9 +47,16 @@ type AddArgs =
                 matching this pattern will be backed up. The default is \
                 **/* which will recursively back up all saves in SAVE_PATH"
 
+type ListArgs =
+    | [<Hidden>] Hidden
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Hidden -> ""
+
 type InfoArgs =
     | [<MainCommand>] Games of games: string list
-    | [<AltCommandLine("-b")>] Brief
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -57,7 +64,6 @@ type InfoArgs =
             | Games _ ->
                 "List of games to display info for. If not \
                 provided, will display info for all games"
-            | Brief -> "Output only game names"
 
 type RemoveArgs =
     | [<MainCommand; Mandatory>] Games of games: string list
@@ -104,6 +110,7 @@ type ConfigArgs =
 type SbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Backup of ParseResults<BackupArgs>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddArgs>
+    | [<CliPrefix(CliPrefix.None)>] List of ParseResults<ListArgs>
     | [<CliPrefix(CliPrefix.None)>] Info of ParseResults<InfoArgs>
     | [<CliPrefix(CliPrefix.None)>] Remove of ParseResults<RemoveArgs>
     | [<CliPrefix(CliPrefix.None)>] Edit of ParseResults<EditArgs>
@@ -116,6 +123,7 @@ type SbuArgs =
             match this with
             | Backup _ -> "Backup your game saves"
             | Add _ -> "Add games to backup"
+            | List _ -> "List names of games that can be backed up"
             | Info _ -> "List info for games"
             | Remove _ -> "Remove games from backup"
             | Edit _ -> "Edit game info"
@@ -414,7 +422,14 @@ let add (game: string) (path: string) (glob: string option): App<Config option> 
             return Some { config with Games = newGames }
     }
 
-let info (gameNames: string list option) (brief: bool): App<Config option> =
+let list (): App<Config option> =
+    monad {
+        let! config = ask
+        iter (fun g -> printfn "%s" g.Name) config.Games
+        return None
+    }
+
+let info (gameNames: string list option): App<Config option> =
     monad {
         let! config = ask
 
@@ -427,11 +442,7 @@ let info (gameNames: string list option) (brief: bool): App<Config option> =
             | None -> config.Games
             | Some gs -> filter (fun g -> exists ((=) g.Name) gs) config.Games
 
-        if brief then
-            iter (fun g -> printfn "%s" g.Name) games
-        else
-            iter (fun g -> printGame g None None None) games
-
+        iter (fun g -> printGame g None None None) games
         return None
     }
 
@@ -601,7 +612,8 @@ let app (parseResults: ParseResults<_>): App<Config option> =
             match command with
             | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
             | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
-            | Info sp -> info (sp.TryGetResult InfoArgs.Games) (sp.Contains Brief)
+            | List _ -> list ()
+            | Info sp -> info (sp.TryGetResult InfoArgs.Games)
             | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
             | Edit sp ->
                 edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
@@ -619,7 +631,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v0.0.8"
+            printfn "sbu v1.0.0"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
