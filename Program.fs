@@ -150,7 +150,7 @@ let warn s =
 let err s =
     "Error: " + s |> printWithColor ConsoleColor.Red
 
-let warnMissingGames games: App<unit> =
+let inline warnMissingGames games: App<unit> =
     monad {
         let! config = ask
 
@@ -329,7 +329,7 @@ let backupGame gameName verbose: App<string seq> =
                 warn $"Path set for {gameName} doesn't exist: {game.Path}"
                 return empty
         | None ->
-            do! warnMissingGames (result gameName)
+            do! warnMissingGames [ gameName ]
             return empty
     }
 
@@ -457,7 +457,7 @@ let rec promptYorN prompt =
     | "n" -> false
     | _ -> promptYorN prompt
 
-let remove (games: string list) (yes: bool): App<Config option> =
+let remove (games: string NonEmptyList) (yes: bool): App<Config option> =
     monad {
         let! config = ask
         do! warnMissingGames games
@@ -617,7 +617,7 @@ let app (parseResults: ParseResults<_>): App<Config option> =
             | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
             | List _ -> list ()
             | Info sp -> info (sp.TryGetResult InfoArgs.Games)
-            | Remove sp -> remove (sp.GetResult Games) (sp.Contains Yes)
+            | Remove sp -> remove (NonEmptyList.ofList (sp.GetResult Games)) (sp.Contains Yes)
             | Edit sp ->
                 edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
             | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
