@@ -36,7 +36,7 @@ type BackupArgs =
 
 type AddArgs =
     | [<MainCommand; Mandatory; Unique>] Game of game: string
-    | [<AltCommandLine("-p")>] Path of save_path: string
+    | [<AltCommandLine("-p"); Mandatory>] Path of save_path: string
     | [<AltCommandLine("-g")>] Glob of save_glob: string
 
     interface IArgParserTemplate with
@@ -655,7 +655,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.0.0"
+            printfn "sbu v1.0.1"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
