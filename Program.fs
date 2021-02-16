@@ -416,7 +416,6 @@ let add (game: string) (path: string) (glob: string option): App<Config option> 
                 result newGame
                 |> plus config.Games
                 |> sortBy (fun g -> g.Name)
-                |> toArray
 
             printfn "Successfully added %s\n" game
             printGame newGame None None None
