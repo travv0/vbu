@@ -253,7 +253,8 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
                                 toPath,
                                 toPath
                                 + ".bak."
-                                + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
+                                + toModTime.ToString("yyyy_MM_dd_HH_mm_ss"),
+                                true
                             )
 
                             return! copyAndCleanup ()
@@ -655,7 +656,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.0.1"
+            printfn "sbu v1.0.2"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
