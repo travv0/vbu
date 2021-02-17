@@ -238,29 +238,36 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
 
             let backupFile' () =
                 monad {
-                    let fromModTime = File.GetLastWriteTimeUtc(fromPath)
+                    let fromInfo = FileInfo(fromPath)
 
-                    let toModTime =
-                        if File.Exists(toPath) then
-                            Some(File.GetLastWriteTimeUtc(toPath))
-                        else
-                            None
+                    let fromIsReparsePoint =
+                        fromInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)
 
-                    match toModTime with
-                    | Some toModTime ->
-                        if fromModTime <> toModTime then
-                            File.Move(
-                                toPath,
-                                toPath
-                                + ".bak."
-                                + toModTime.ToString("yyyy_MM_dd_HH_mm_ss"),
-                                true
-                            )
+                    if not fromIsReparsePoint then
+                        let fromModTime = fromInfo.LastWriteTimeUtc
 
-                            return! copyAndCleanup ()
-                        else
-                            return (0, empty)
-                    | None -> return! copyAndCleanup ()
+                        let toModTime =
+                            if File.Exists(toPath) then
+                                Some(File.GetLastWriteTimeUtc(toPath))
+                            else
+                                None
+
+                        match toModTime with
+                        | Some toModTime ->
+                            if fromModTime <> toModTime then
+                                File.Move(
+                                    toPath,
+                                    toPath
+                                    + ".bak."
+                                    + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
+                                )
+
+                                return! copyAndCleanup ()
+                            else
+                                return (0, empty)
+                        | None -> return! copyAndCleanup ()
+                    else
+                        return (0, empty)
                 }
 
             if Directory.Exists(fromPath) then
@@ -656,7 +663,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.0.2"
+            printfn "sbu v1.0.3"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
