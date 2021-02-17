@@ -158,7 +158,7 @@ let inline warnMissingGames games: App<unit> =
             fold
                 (fun warningPrinted game ->
                     if not (exists (fun g -> g.Name = game) config.Games) then
-                        warn $"No game named `{game}'"
+                        warn <| sprintf "No game named `%s'" game
                         true
                     else
                         warningPrinted)
@@ -212,7 +212,9 @@ let cleanupBackups (backupPath: string) verbose: App<unit> =
                 let filesToDelete = skip config.NumToKeep sortedFiles
 
                 for file in filesToDelete do
-                    if verbose then warn $"Deleting {file}"
+                    if verbose then
+                        warn <| sprintf "Deleting %s" file
+
                     File.Delete(file)
     }
 
@@ -334,7 +336,9 @@ let backupGame gameName verbose: App<string seq> =
 
                 return warnings
             else
-                warn $"Path set for {gameName} doesn't exist: {game.Path}"
+                warn
+                <| sprintf "Path set for %s doesn't exist: %s" gameName game.Path
+
                 return empty
         | None ->
             do! warnMissingGames [ gameName ]
@@ -360,7 +364,9 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App
                             let! warnings = backupGame game verbose
                             return acc ++ warnings
                         with e ->
-                            err $"Error backing up {game}: {e.Message}"
+                            err
+                            <| sprintf "Error backing up %s: %s" game e.Message
+
                             return acc
                     })
                 empty
@@ -407,11 +413,15 @@ let add (game: string) (path: string) (glob: string option): App<Config option> 
         let! config = ask
 
         if exists (fun g -> g.Name = game) config.Games then
-            err $"Error: Game with the name {game} already exists"
+            err
+            <| sprintf "Game with the name %s already exists" game
+
             return None
         elif not (isValidGameName game) then
             err
-                "Invalid characters in name `{game}': only alphanumeric characters, underscores, and hyphens are allowed"
+            <| sprintf
+                "Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
+                game
 
             return None
         else
@@ -531,7 +541,9 @@ let edit
 
                 if not (isValidGameName newName') then
                     err
-                        $"Invalid characters in name `{newName'}': only alphanumeric characters, underscores, and hyphens are allowed"
+                    <| sprintf
+                        "Invalid characters in name `%s': only alphanumeric characters, underscores, and hyphens are allowed"
+                        newName'
 
                     return None
                 else
@@ -641,12 +653,12 @@ let loadConfig configPath =
         |> File.ReadAllText
         |> JsonSerializer.Deserialize<Config>
     with e ->
-        sprintf
+        warn
+        <| sprintf
             "Couldn't load config: %s\nAttempting to save default config \
                     to '%s' after backing up existing config.\n"
             e.Message
             configPath
-        |> warn
 
         if File.Exists(configPath) then
             File.Copy(configPath, configPath + ".bak", true)
@@ -663,7 +675,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.0.3"
+            printfn "sbu v1.0.4"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
