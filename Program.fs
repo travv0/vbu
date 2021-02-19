@@ -22,6 +22,9 @@ let withColor color f =
 let printWithColor color s =
     withColor color (fun () -> printfn "%s" s)
 
+let note s =
+    "Note: " + s |> printWithColor ConsoleColor.Blue
+
 let warn s =
     "Warning: " + s
     |> printWithColor ConsoleColor.Yellow
@@ -92,7 +95,7 @@ let cleanupBackups (backupPath: string) verbose: App<unit> =
 
                 for file in filesToDelete do
                     if verbose then
-                        warn <| sprintf "Deleting %s" file
+                        note <| sprintf "Deleting %s" file
 
                     File.Delete(file)
     }
@@ -125,6 +128,12 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
                         fromInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)
 
                     if fromIsReparsePoint then
+                        if verbose then
+                            note
+                            <| sprintf
+                                "%s appears to be a link to somewhere else in the filesystem. Skipping..."
+                                fromPath
+
                         return (0, empty)
                     else
                         let fromModTime = fromInfo.LastWriteTimeUtc
@@ -555,7 +564,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.0.5"
+            printfn "sbu v1.1.0"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
