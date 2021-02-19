@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
@@ -7,15 +6,14 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
-
   <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Args.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.1.1" />
     <PackageReference Include="DotNet.Glob" Version="3.1.2" />
     <PackageReference Include="FSharpPlus" Version="1.1.7" />
   </ItemGroup>
-
 </Project>
