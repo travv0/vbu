@@ -12,6 +12,8 @@ open System.Threading
 open Args
 open Types
 
+let asks f: Reader<'a, 'b> = liftM f ask
+
 let defaultGlob = "**/*"
 
 let withColor color f =
@@ -34,7 +36,7 @@ let err s =
 
 let inline warnMissingGames games: App<unit> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
 
         let warningPrinted =
             fold
@@ -69,9 +71,9 @@ let printGame game newName newPath newGlob =
 
     printfn ""
 
-let cleanupBackups (backupPath: string) verbose: App<unit> =
+let cleanupBackups (backupPath: string): App<unit> =
     monad {
-        let! config = ask
+        let! { Config = config; Verbose = verbose } = ask
 
         if config.NumToKeep > 0 then
             let glob =
@@ -100,7 +102,7 @@ let cleanupBackups (backupPath: string) verbose: App<unit> =
                     File.Delete(file)
     }
 
-let rec backupFile game basePath glob fromPath toPath verbose: App<int * string seq> =
+let rec backupFile game basePath glob fromPath toPath: App<int * string seq> =
     monad {
         try
             let globMatches () =
@@ -116,12 +118,13 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
 
                     printfn "%s ==>\n\t%s" fromPath toPath
                     File.Copy(fromPath, toPath)
-                    do! cleanupBackups toPath verbose
+                    do! cleanupBackups toPath
                     return (1, empty)
                 }
 
             let backupFile' () =
                 monad {
+                    let! verbose = asks (fun c -> c.Verbose)
                     let fromInfo = FileInfo(fromPath)
 
                     let fromIsReparsePoint =
@@ -161,7 +164,7 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
                 }
 
             if Directory.Exists(fromPath) then
-                return! backupFiles game basePath glob fromPath toPath verbose
+                return! backupFiles game basePath glob fromPath toPath
             else if globMatches () then
                 return! backupFile' ()
             else
@@ -174,7 +177,7 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
             return (1, result warning)
     }
 
-and backupFiles game basePath glob fromPath toPath verbose: App<int * string seq> =
+and backupFiles game basePath glob fromPath toPath: App<int * string seq> =
     monad {
         return!
             Directory.EnumerateFileSystemEntries(fromPath)
@@ -185,16 +188,16 @@ and backupFiles game basePath glob fromPath toPath verbose: App<int * string seq
                         let file = Path.GetFileName(path)
 
                         let! (newCount, newErrs) =
-                            backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file)) verbose
+                            backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file))
 
                         return (c + newCount, es ++ newErrs)
                     })
                 (0, empty)
     }
 
-let backupGame gameName verbose: App<string seq> =
+let backupGame gameName: App<string seq> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
         let startTime = DateTime.Now
 
         let game =
@@ -204,7 +207,7 @@ let backupGame gameName verbose: App<string seq> =
         | Some game ->
             if Directory.Exists game.Path then
                 let! (backedUpCount, warnings) =
-                    backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName)) verbose
+                    backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName))
 
                 if (backedUpCount > 0) then
                     let now = DateTime.Now
@@ -233,9 +236,9 @@ let backupGame gameName verbose: App<string seq> =
             return empty
     }
 
-let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App<Config option> =
+let rec backup (gameNames: string list option) (loop: bool): App<Config option> =
     monad {
-        let! config = ask
+        let! { Config = config; Verbose = verbose } = ask
 
         let gameNames' =
             match gameNames with
@@ -249,7 +252,7 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App
                 (fun acc game ->
                     monad {
                         try
-                            let! warnings = backupGame game verbose
+                            let! warnings = backupGame game
                             return acc ++ warnings
                         with e ->
                             err
@@ -273,12 +276,12 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App
 
         if loop then
             Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
-            return! backup gameNames loop verbose
+            return! backup gameNames loop
         else
             return None
     }
 
-let validGameNameChars: char Set =
+let validGameNameChars: Set<char> =
     [ 'A' .. 'Z' ]
     ++ [ 'a' .. 'z' ]
     ++ [ '0' .. '9' ]
@@ -299,7 +302,7 @@ let absolutePath (path: string) =
 
 let add (game: string) (path: string) (glob: string option): App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
 
         if exists (fun g -> g.Name = game) config.Games then
             err
@@ -332,14 +335,14 @@ let add (game: string) (path: string) (glob: string option): App<Config option> 
 
 let list (): App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
         iter (fun g -> printfn "%s" g.Name) config.Games
         return None
     }
 
 let info (gameNames: string list option): App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
 
         match gameNames with
         | Some gns -> do! warnMissingGames gns
@@ -365,7 +368,7 @@ let rec promptYorN prompt =
 
 let remove (games: string NonEmptyList) (yes: bool): App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
         do! warnMissingGames games
 
         let newGames =
@@ -391,7 +394,7 @@ let edit
     (newGlob: string option)
     : App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
 
         match (newName, newPath, newGlob) with
         | (None, None, None) ->
@@ -448,12 +451,12 @@ let edit
                     return
                         Some
                             { config with
-                                  Games = front ++ result editedGame ++ back |> toArray }
+                                  Games = front ++ result editedGame ++ back |> ofSeq }
     }
 
 let printConfig newBackupDir newBackupFreq newBackupsToKeep: App<unit> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
         printConfigRow "Backup path" config.Path newBackupDir
 
         printConfigRow
@@ -471,7 +474,7 @@ let printConfig newBackupDir newBackupFreq newBackupsToKeep: App<unit> =
 
 let editConfig backupDir backupFreq backupsToKeep: App<Config option> =
     monad {
-        let! config = ask
+        let! config = asks (fun c -> c.Config)
 
         let newBackupDir =
             Option.defaultValue config.Path backupDir
@@ -521,7 +524,12 @@ let app (parseResults: ParseResults<_>): App<Config option> =
 
         return!
             match command with
-            | Backup sp -> backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop) (sp.Contains Verbose)
+            | Backup sp ->
+                local
+                    (fun c ->
+                        { c with
+                              Verbose = (sp.Contains Verbose) })
+                <| backup (sp.TryGetResult BackupArgs.Games) (sp.Contains Loop)
             | Add sp -> add (sp.GetResult AddArgs.Game) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
             | List _ -> list ()
             | Info sp -> info (sp.TryGetResult InfoArgs.Games)
@@ -571,7 +579,9 @@ let main argv =
                 |> Option.defaultValue defaultConfigPath
 
             let config = loadConfig configPath
-            let newConfig = runApp parseResults config
+
+            let newConfig =
+                runApp parseResults { Config = config; Verbose = false }
 
             match newConfig with
             | None -> ()

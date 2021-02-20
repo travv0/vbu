@@ -13,4 +13,6 @@ type Config =
       NumToKeep: int
       Games: Game [] }
 
-type App<'a> = Reader<Config, 'a>
+type RunConfig = { Config: Config; Verbose: bool }
+
+type App<'a> = Reader<RunConfig, 'a>
