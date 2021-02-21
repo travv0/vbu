@@ -115,7 +115,7 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
             printfn "%s ==>\n\t%s" fromPath toPath
             File.Copy(fromPath, toPath)
             cleanupBackups toPath verbose config
-            (1, Seq.empty)
+            (1, List.empty)
 
         let backupFile' () =
             let fromInfo = FileInfo(fromPath)
@@ -128,7 +128,7 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
                     note
                     <| sprintf "%s appears to be a link to somewhere else in the filesystem. Skipping..." fromPath
 
-                (0, Seq.empty)
+                (0, List.empty)
             else
                 let fromModTime = fromInfo.LastWriteTimeUtc
 
@@ -150,7 +150,7 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
 
                         copyAndCleanup ()
                     else
-                        (0, Seq.empty)
+                        (0, List.empty)
                 | None -> copyAndCleanup ()
 
         if Directory.Exists(fromPath) then
@@ -158,13 +158,13 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
         else if globMatches () then
             backupFile' ()
         else
-            (0, Seq.empty)
+            (0, List.empty)
     with e ->
         let warning =
             sprintf "Unable to backup file %s for game %s:\n%s\n" toPath game e.Message
 
         warn warning
-        (1, Seq.singleton warning)
+        (1, List.singleton warning)
 
 and backupFiles game basePath glob fromPath toPath verbose config =
     Directory.EnumerateFileSystemEntries(fromPath)
@@ -175,8 +175,8 @@ and backupFiles game basePath glob fromPath toPath verbose config =
             let (newCount, newErrs) =
                 backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file)) verbose config
 
-            (c + newCount, Seq.append es newErrs))
-        (0, Seq.empty)
+            (c + newCount, List.append es newErrs))
+        (0, List.empty)
 
 let backupGame gameName verbose config =
     let startTime = DateTime.Now
@@ -192,7 +192,7 @@ let backupGame gameName verbose config =
 
             if (backedUpCount > 0) then
                 let now = DateTime.Now
-                let warningCount = Seq.length warnings
+                let warningCount = warnings.Length
 
                 printfn
                     "\nFinished backing up %d file%s%s for %s in %fs on %s at %s\n"
@@ -212,10 +212,10 @@ let backupGame gameName verbose config =
             warn
             <| sprintf "Path set for %s doesn't exist: %s" gameName game.Path
 
-            Seq.empty
+            List.empty
     | None ->
         warnMissingGames [ gameName ] config
-        Seq.empty
+        List.empty
 
 let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) config =
     let gameNames' =
@@ -229,15 +229,15 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) conf
             (fun acc game ->
                 try
                     let warnings = backupGame game verbose config
-                    Seq.append acc warnings
+                    List.append acc warnings
                 with e ->
                     err
                     <| sprintf "Error backing up %s: %s" game e.Message
 
                     acc)
-            Seq.empty
+            List.empty
 
-    let warningCount = Seq.length warnings
+    let warningCount = warnings.Length
 
     if warningCount > 0 then
         withColor
@@ -510,7 +510,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.2.0"
+            printfn "sbu v1.2.1"
         else
             let configPath =
                 parseResults.TryGetResult Config_Path
