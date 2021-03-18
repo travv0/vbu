@@ -32,7 +32,7 @@ let warn s =
 let err s =
     "Error: " + s |> printWithColor ConsoleColor.Red
 
-let warnMissingGames (games: string seq): App<unit> =
+let warnMissingGames (games: string seq) : App<unit> =
     monad {
         let! config = ask
 
@@ -69,7 +69,7 @@ let printGame game newName newPath newGlob =
 
     printfn ""
 
-let cleanupBackups (backupPath: string) verbose: App<unit> =
+let cleanupBackups (backupPath: string) verbose : App<unit> =
     monad {
         let! config = ask
 
@@ -100,7 +100,7 @@ let cleanupBackups (backupPath: string) verbose: App<unit> =
                     File.Delete(file)
     }
 
-let rec backupFile game basePath glob fromPath toPath verbose: App<int * string list> =
+let rec backupFile game basePath glob fromPath toPath verbose : App<int * string list> =
     monad {
         try
             let globMatches () =
@@ -174,7 +174,7 @@ let rec backupFile game basePath glob fromPath toPath verbose: App<int * string 
             return (1, result warning)
     }
 
-and backupFiles game basePath glob fromPath toPath verbose: App<int * string list> =
+and backupFiles game basePath glob fromPath toPath verbose : App<int * string list> =
     monad {
         return!
             Directory.EnumerateFileSystemEntries(fromPath)
@@ -192,7 +192,7 @@ and backupFiles game basePath glob fromPath toPath verbose: App<int * string lis
                 (0, empty)
     }
 
-let backupGame gameName verbose: App<string list> =
+let backupGame gameName verbose : App<string list> =
     monad {
         let! config = ask
         let startTime = DateTime.Now
@@ -234,7 +234,7 @@ let backupGame gameName verbose: App<string list> =
             return empty
     }
 
-let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App<Config option> =
+let rec backup (gameNames: string list option) (loop: bool) (verbose: bool) : App<Config option> =
     monad {
         let! config = ask
 
@@ -281,7 +281,7 @@ let rec backup (gameNames: string list option) (loop: bool) (verbose: bool): App
             return None
     }
 
-let validGameNameChars: Set<char> =
+let validGameNameChars : Set<char> =
     [ 'A' .. 'Z' ]
     ++ [ 'a' .. 'z' ]
     ++ [ '0' .. '9' ]
@@ -300,7 +300,7 @@ let absolutePath (path: string) =
     else
         Path.GetFullPath path
 
-let add (game: string) (path: string) (glob: string option): App<Config option> =
+let add (game: string) (path: string) (glob: string option) : App<Config option> =
     monad {
         let! config = ask
 
@@ -332,14 +332,14 @@ let add (game: string) (path: string) (glob: string option): App<Config option> 
             return Some { config with Games = newGames }
     }
 
-let list (): App<Config option> =
+let list () : App<Config option> =
     monad {
         let! config = ask
         iter (fun g -> printfn "%s" g.Name) config.Games
         return None
     }
 
-let info (gameNames: string list option): App<Config option> =
+let info (gameNames: string list option) : App<Config option> =
     monad {
         let! config = ask
 
@@ -365,7 +365,7 @@ let rec promptYorN prompt =
     | "n" -> false
     | _ -> promptYorN prompt
 
-let remove (games: string NonEmptyList) (yes: bool): App<Config option> =
+let remove (games: string NonEmptyList) (yes: bool) : App<Config option> =
     monad {
         let! config = ask
         do! warnMissingGames games
@@ -453,25 +453,16 @@ let edit
                                   Games = front ++ result editedGame ++ back |> ofSeq }
     }
 
-let printConfig newBackupDir newBackupFreq newBackupsToKeep: App<unit> =
+let printConfig newBackupDir newBackupFreq newBackupsToKeep : App<unit> =
     monad {
         let! config = ask
         printConfigRow "Backup path" config.Path newBackupDir
-
-        printConfigRow
-            "Backup frequency (in minutes)"
-            (config.Frequency.ToString())
-            (map (fun freq -> freq.ToString()) newBackupFreq)
-
-        printConfigRow
-            "Number of backups to keep"
-            (config.NumToKeep.ToString())
-            (map (fun toKeep -> toKeep.ToString()) newBackupsToKeep)
-
+        printConfigRow "Backup frequency (in minutes)" (string config.Frequency) (string <!> newBackupFreq)
+        printConfigRow "Number of backups to keep" (string config.NumToKeep) (string <!> newBackupsToKeep)
         printfn ""
     }
 
-let editConfig backupDir backupFreq backupsToKeep: App<Config option> =
+let editConfig backupDir backupFreq backupsToKeep : App<Config option> =
     monad {
         let! config = ask
 
@@ -514,7 +505,7 @@ let saveDefaultConfig path =
 
     File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
 
-let app (parseResults: ParseResults<_>): App<Config option> =
+let app (parseResults: ParseResults<_>) : App<Config option> =
     monad {
         let command = parseResults.GetSubCommand()
 
@@ -529,7 +520,7 @@ let app (parseResults: ParseResults<_>): App<Config option> =
                 edit (sp.GetResult Game) (sp.TryGetResult Name) (sp.TryGetResult EditArgs.Path) (sp.TryGetResult Glob)
             | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
             | Config_Path _
-            | Version -> failwithf "non-command matched as command: %s" (command.ToString())
+            | Version -> failwithf "non-command matched as command: %A" command
     }
 
 let loadConfig configPath =
