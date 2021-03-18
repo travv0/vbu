@@ -5,21 +5,23 @@ module Args
 open Argu
 
 type BackupArgs =
-    | [<MainCommand>] Games of games: string list
+    | [<MainCommand>] Games of games : string list
     | [<AltCommandLine("-l")>] Loop
     | [<AltCommandLine("-v")>] Verbose
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Games _ -> "List of games to back up.  If not provided, will back up all games"
-            | Loop -> "Keep running, backing up games at the interval specified in your config file"
+            | Games _ ->
+                "List of games to back up.  If not provided, will back up all games"
+            | Loop ->
+                "Keep running, backing up games at the interval specified in your config file"
             | Verbose -> "Print verbose output"
 
 type AddArgs =
-    | [<MainCommand; Mandatory; Unique>] Game of game: string
-    | [<AltCommandLine("-p"); Mandatory>] Path of save_path: string
-    | [<AltCommandLine("-g")>] Glob of save_glob: string
+    | [<MainCommand; Mandatory; Unique>] Game of game : string
+    | [<AltCommandLine("-p"); Mandatory>] Path of save_path : string
+    | [<AltCommandLine("-g")>] Glob of save_glob : string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -40,7 +42,7 @@ type ListArgs =
             | Hidden -> ""
 
 type InfoArgs =
-    | [<MainCommand>] Games of games: string list
+    | [<MainCommand>] Games of games : string list
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -50,7 +52,7 @@ type InfoArgs =
                 provided, will display info for all games"
 
 type RemoveArgs =
-    | [<MainCommand; Mandatory>] Games of games: string list
+    | [<MainCommand; Mandatory>] Games of games : string list
     | [<AltCommandLine("-y")>] Yes
 
     interface IArgParserTemplate with
@@ -60,10 +62,10 @@ type RemoveArgs =
             | Yes -> "Remove all without confirmation prompts"
 
 type EditArgs =
-    | [<MainCommand; Unique; Mandatory>] Game of game: string
-    | [<AltCommandLine("-n")>] Name of new_name: string
-    | [<AltCommandLine("-p")>] Path of new_save_path: string
-    | [<AltCommandLine("-g")>] Glob of new_save_glob: string
+    | [<MainCommand; Unique; Mandatory>] Game of game : string
+    | [<AltCommandLine("-n")>] Name of new_name : string
+    | [<AltCommandLine("-p")>] Path of new_save_path : string
+    | [<AltCommandLine("-g")>] Glob of new_save_glob : string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -79,18 +81,21 @@ type EditArgs =
                 glob **/* which will recursively back up all files"
 
 type ConfigArgs =
-    | [<AltCommandLine("-p")>] Path of backup_path: string
-    | [<AltCommandLine("-f")>] Frequency of backup_frequency: int
-    | [<AltCommandLine("-k")>] Keep of backups_to_keep: int
+    | [<AltCommandLine("-p")>] Path of backup_path : string
+    | [<AltCommandLine("-f")>] Frequency of backup_frequency : int
+    | [<AltCommandLine("-k")>] Keep of backups_to_keep : int
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Path _ -> "Set path to directory in which to back up saves"
-            | Frequency _ -> "Set frequency in minutes to backup saves when looping"
+            | Frequency _ ->
+                "Set frequency in minutes to backup saves when looping"
             | Keep _ -> "Set how many copies of each backed-up file to keep"
 
-[<HelpDescription("Show this help text"); HelpFlags("--help", "-h"); NoAppSettings>]
+[<HelpDescription("Show this help text");
+  HelpFlags("--help", "-h");
+  NoAppSettings>]
 type SbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Backup of ParseResults<BackupArgs>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddArgs>
@@ -99,7 +104,7 @@ type SbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Remove of ParseResults<RemoveArgs>
     | [<CliPrefix(CliPrefix.None)>] Edit of ParseResults<EditArgs>
     | [<CliPrefix(CliPrefix.None)>] Config of ParseResults<ConfigArgs>
-    | Config_Path of config_path: string
+    | Config_Path of config_path : string
     | Version
 
     interface IArgParserTemplate with
