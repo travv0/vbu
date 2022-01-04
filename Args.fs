@@ -1,11 +1,9 @@
 module Args
 
-// fsharplint:disable UnionCasesNames
-
 open Argu
 
 type BackupArgs =
-    | [<MainCommand>] Games of games: string list
+    | [<MainCommand>] Games of games: list<string>
     | [<AltCommandLine("-l")>] Loop
     | [<AltCommandLine("-v")>] Verbose
 
@@ -40,7 +38,7 @@ type ListArgs =
             | Hidden -> ""
 
 type InfoArgs =
-    | [<MainCommand>] Games of games: string list
+    | [<MainCommand>] Games of games: list<string>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -50,7 +48,7 @@ type InfoArgs =
                 provided, will display info for all games"
 
 type RemoveArgs =
-    | [<MainCommand; Mandatory>] Games of games: string list
+    | [<MainCommand; Mandatory>] Games of games: list<string>
     | [<AltCommandLine("-y")>] Yes
 
     interface IArgParserTemplate with
@@ -99,8 +97,8 @@ type SbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Remove of ParseResults<RemoveArgs>
     | [<CliPrefix(CliPrefix.None)>] Edit of ParseResults<EditArgs>
     | [<CliPrefix(CliPrefix.None)>] Config of ParseResults<ConfigArgs>
-    | Config_Path of config_path: string
-    | Version
+    | [<CustomCommandLine("--config"); AltCommandLine("-c")>] ConfigPath of config_path: string
+    | [<AltCommandLine("-V")>] Version
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -112,5 +110,5 @@ type SbuArgs =
             | Remove _ -> "Remove games from backup"
             | Edit _ -> "Edit game info"
             | Config _ -> "Manage sbu configuration"
-            | Config_Path _ -> "Path to configuration file"
+            | ConfigPath _ -> "Path to configuration file"
             | Version -> "Print version information"

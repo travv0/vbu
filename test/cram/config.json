@@ -1,0 +1,16 @@
+{
+    "Path": "./.sbu-backups",
+    "Frequency": 15,
+    "NumToKeep": 3,
+    "Games": [{
+        "Name": "another",
+        "Path": "/another/path",
+        "Glob": {
+            "Value": "save*"
+        }
+    }, {
+        "Name": "test",
+        "Path": "/test/game/path",
+        "Glob": null
+    }]
+}
