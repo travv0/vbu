@@ -4,7 +4,6 @@ open Argu
 open DotNet.Globbing
 open System
 open System.IO
-open System.Text.Json
 open System.Threading
 open Util.FileSystem
 open Util.Terminal

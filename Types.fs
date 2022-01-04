@@ -3,6 +3,7 @@ module Types
 open System
 open System.IO
 open System.Text.Json
+open Util.FileSystem
 
 let printConfigRow label value newValue =
     printfn "%s: %s%s" label value
@@ -51,7 +52,9 @@ module Config =
     open Util.Terminal
 
     let def =
-        { Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbu-backups")
+        { Path =
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            +/ ".sbu-backups"
           Frequency = 15
           NumToKeep = 20
           Games = [||] }

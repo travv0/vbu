@@ -34,16 +34,16 @@ module Terminal =
         | _ -> promptYorN prompt
 
 module FileSystem =
+    let (+/) (path1: string) path2 = Path.Join(path1, path2)
+
     let absolutePath (path: string) =
         if path.Length > 0 && path.[0] = '~' then
             let home =
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
 
-            Path.Join(home, path.[1..]) |> Path.GetFullPath
+            home +/ path.[1..] |> Path.GetFullPath
         else
             Path.GetFullPath path
-
-    let (+/) (path1: string) path2 = Path.Join(path1, path2)
 
     let defaultConfigPath =
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
