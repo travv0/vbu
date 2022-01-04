@@ -6,6 +6,7 @@
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Util.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Args.fs" />
     <Compile Include="Program.fs" />

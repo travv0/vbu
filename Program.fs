@@ -6,30 +6,11 @@ open System
 open System.IO
 open System.Text.Json
 open System.Threading
+open Util.FileSystem
+open Util.Terminal
 
 open Args
 open Types
-
-let defaultGlob = "**/*"
-
-let withColor color f =
-    Console.ForegroundColor <- color
-    f ()
-    Console.ResetColor()
-
-let printWithColor color s =
-    withColor color (fun () -> printfn "%s" s)
-
-let note verbose s =
-    if verbose then
-        "Note: " + s |> printWithColor ConsoleColor.Blue
-
-let warn s =
-    "Warning: " + s
-    |> printWithColor ConsoleColor.Yellow
-
-let err s =
-    "Error: " + s |> printWithColor ConsoleColor.Red
 
 let warnMissingGames (games: list<string>) config =
     let warningPrinted =
@@ -44,24 +25,6 @@ let warnMissingGames (games: list<string>) config =
             games
 
     if warningPrinted then printfn ""
-
-let printConfigRow label value newValue =
-    printfn "%s: %s%s" label value
-    <| match newValue with
-       | Some nv when value = nv -> ""
-       | Some nv -> $" -> %s{nv}"
-       | None -> ""
-
-let printGame game newName newPath newGlob =
-    printConfigRow "Name" game.Name newName
-    printConfigRow "Save path" game.Path newPath
-
-    match (game.Glob, newGlob) with
-    | Some _, _
-    | None, Some _ -> printConfigRow "Save glob" (Option.defaultValue "" game.Glob) newGlob
-    | _ -> ()
-
-    printfn ""
 
 let cleanupBackups (backupPath: string) verbose config =
     if config.NumToKeep > 0 then
@@ -93,7 +56,10 @@ let rec backupFile game basePath glob fromPath toPath verbose config =
     try
         let globMatches () =
             let glob =
-                Glob.Parse(Path.Join(basePath, Option.defaultValue defaultGlob glob))
+                Glob.Parse(
+                    basePath
+                    +/ Option.defaultValue Game.defaultGlob glob
+                )
 
             glob.IsMatch(fromPath: string)
 
@@ -161,7 +127,7 @@ and backupFiles game basePath glob fromPath toPath verbose config =
             let file = Path.GetFileName(path)
 
             let newCount, newErrs =
-                backupFile game basePath glob (Path.Join(fromPath, file)) (Path.Join(toPath, file)) verbose config
+                backupFile game basePath glob (fromPath +/ file) (toPath +/ file) verbose config
 
             (c + newCount, es @ newErrs))
         (0, [])
@@ -176,7 +142,7 @@ let backupGame gameName verbose config =
     | Some game ->
         if Directory.Exists game.Path then
             let backedUpCount, warnings =
-                backupFiles game.Name game.Path game.Glob game.Path (Path.Join(config.Path, gameName)) verbose config
+                backupFiles game.Name game.Path game.Glob game.Path (config.Path +/ gameName) verbose config
 
             if (backedUpCount > 0) then
                 let now = DateTime.Now
@@ -240,28 +206,11 @@ let rec backup (gameNames: option<list<string>>) (loop: bool) (verbose: bool) co
     else
         None
 
-let validGameNameChars: Set<char> =
-    [ 'A' .. 'Z' ]
-    @ [ 'a' .. 'z' ] @ [ '0' .. '9' ] @ [ '-'; '_' ]
-    |> Set.ofList
-
-let isValidGameName (name: string) =
-    String.forall (fun c -> Set.contains c validGameNameChars) name
-
-let absolutePath (path: string) =
-    if path.Length > 0 && path.[0] = '~' then
-        let home =
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-
-        Path.Join(home, path.[1..]) |> Path.GetFullPath
-    else
-        Path.GetFullPath path
-
 let add (game: string) (path: string) (glob: option<string>) config =
     if Array.exists (fun g -> g.Name = game) config.Games then
         err $"Game with the name %s{game} already exists"
         None
-    elif not (isValidGameName game) then
+    elif not (Game.isValidName game) then
         err $"Invalid characters in name `%s{game}': only alphanumeric characters, underscores, and hyphens are allowed"
         None
     else
@@ -275,7 +224,7 @@ let add (game: string) (path: string) (glob: option<string>) config =
             |> Array.sortBy (fun g -> g.Name)
 
         printfn "Game added successfully:\n"
-        printGame newGame None None None
+        Game.print newGame
         Some { config with Games = newGames }
 
 let list config =
@@ -292,18 +241,8 @@ let info (gameNames: option<list<string>>) config =
         | None -> config.Games
         | Some gs -> Array.filter (fun g -> List.contains g.Name gs) config.Games
 
-    Array.iter (fun g -> printGame g None None None) games
+    Array.iter Game.print games
     None
-
-let rec promptYorN prompt =
-    stdout.Flush()
-    printf $"%s{prompt} (y/N) "
-
-    match Console.ReadLine().Trim().ToLower() with
-    | "y" -> true
-    | "n"
-    | "" -> false
-    | _ -> promptYorN prompt
 
 let remove (games: list<string>) (yes: bool) config =
     warnMissingGames games config
@@ -364,28 +303,22 @@ let edit (gameName: string) (name: option<string>) (path: option<string>) (glob:
                   Path = newPath
                   Glob = newGlobForSave }
 
-            if not (isValidGameName newName) then
+            if not (Game.isValidName newName) then
                 err
                     $"Invalid characters in name `%s{newName}': only alphanumeric characters, underscores, and hyphens are allowed"
 
                 None
             else
-                printGame game (Some newName) (Some newPath) newGlobForPrint
+                Game.printUpdated game (Some newName) (Some newPath) newGlobForPrint
 
                 let backupDirExists =
-                    Directory.Exists(Path.Join(config.Path, gameName))
+                    Directory.Exists(config.Path +/ gameName)
 
                 if (Option.isSome name && backupDirExists) then
                     warn "Game name changed, renaming backup directory..."
-                    Directory.Move(Path.Join(config.Path, gameName), Path.Join(config.Path, newName))
+                    Directory.Move(config.Path +/ gameName, config.Path +/ newName)
 
                 Some { config with Games = front @ editedGame :: back |> List.toArray }
-
-let printConfig config newBackupDir newBackupFreq newBackupsToKeep =
-    printConfigRow "Backup path" config.Path newBackupDir
-    printConfigRow "Backup frequency (in minutes)" (string config.Frequency) (Option.map string newBackupFreq)
-    printConfigRow "Number of backups to keep" (string config.NumToKeep) (Option.map string newBackupsToKeep)
-    printfn ""
 
 let editConfig (backupDir: option<string>) (backupFreq: option<int>) (backupsToKeep: option<int>) config =
     let newBackupDir =
@@ -398,7 +331,7 @@ let editConfig (backupDir: option<string>) (backupFreq: option<int>) (backupsToK
     let newBackupsToKeep =
         Option.defaultValue config.NumToKeep backupsToKeep
 
-    printConfig config (Some newBackupDir) (Some newBackupFreq) (Some newBackupsToKeep)
+    Config.printUpdated config (Some newBackupDir) (Some newBackupFreq) (Some newBackupsToKeep)
 
     match (backupDir, backupFreq, backupsToKeep) with
     | None, None, None -> None
@@ -408,30 +341,6 @@ let editConfig (backupDir: option<string>) (backupFreq: option<int>) (backupsToK
                 Path = newBackupDir
                 Frequency = newBackupFreq
                 NumToKeep = newBackupsToKeep }
-
-let defaultConfigPath =
-    Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbu", "config.json")
-
-let defaultConfig =
-    { Path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sbu-backups")
-      Frequency = 15
-      NumToKeep = 20
-      Games = [||] }
-
-let saveDefaultConfig path =
-    printfn
-        $"Creating new config file at `%s{path}'.\n\
-        Use the `config' command to update default values, which are:\n\
-        \n\
-        Backup path: %s{defaultConfig.Path}\n\
-        Backup frequency (in minutes): %d{defaultConfig.Frequency}\n\
-        Number of backups to keep: %d{defaultConfig.NumToKeep}\n"
-
-    match Path.GetDirectoryName(path: string) with
-    | "" -> ()
-    | path -> Directory.CreateDirectory(path) |> ignore
-
-    File.WriteAllText(path, JsonSerializer.Serialize(defaultConfig))
 
 let app (parseResults: ParseResults<_>) =
     let command = parseResults.GetSubCommand()
@@ -446,26 +355,6 @@ let app (parseResults: ParseResults<_>) =
     | Config sp -> editConfig (sp.TryGetResult Path) (sp.TryGetResult Frequency) (sp.TryGetResult Keep)
     | ConfigPath _
     | Version -> failwithf $"non-command matched as command: %A{command}"
-
-let loadConfig configPath =
-    if not (File.Exists(configPath)) then
-        saveDefaultConfig configPath
-
-    try
-        configPath
-        |> File.ReadAllText
-        |> JsonSerializer.Deserialize<Config>
-    with
-    | e ->
-        warn
-            $"Couldn't load config: %s{e.Message}\nAttempting to save default config \
-            to '%s{configPath}' after backing up existing config.\n"
-
-        if File.Exists(configPath) then
-            File.Copy(configPath, configPath + ".bak", true)
-
-        saveDefaultConfig configPath
-        defaultConfig
 
 [<EntryPoint>]
 let main argv =
@@ -483,7 +372,7 @@ let main argv =
                 parseResults.TryGetResult ConfigPath
                 |> Option.defaultValue defaultConfigPath
 
-            let config = loadConfig configPath
+            let config = Config.load configPath
             let newConfig = app parseResults config
 
             match newConfig with
@@ -493,7 +382,7 @@ let main argv =
                 | "" -> ()
                 | configDir -> Directory.CreateDirectory(configDir) |> ignore
 
-                File.WriteAllText(configPath, JsonSerializer.Serialize(c))
+                Config.save configPath c
     with
     | :? ArguParseException as e -> printfn $"%s{e.Message}"
     | e -> err e.Message
