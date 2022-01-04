@@ -4,6 +4,7 @@
     <TargetFramework>net5.0</TargetFramework>
     <PublishTrimmed>true</PublishTrimmed>
     <PublishReadyToRun>true</PublishReadyToRun>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Util.fs" />
