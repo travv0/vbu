@@ -56,7 +56,7 @@ let cleanupBackups (backupPath: string) verbose config =
                 note verbose $"Deleting %s{file}"
                 File.Delete(file)
 
-let rec backupFile group basePath glob fromPath toPath verbose config =
+let rec backupFile group basePath glob fromPath toPath verbose (force: bool) config =
     try
         let globMatches () =
             let glob =
@@ -72,7 +72,7 @@ let rec backupFile group basePath glob fromPath toPath verbose config =
             |> ignore
 
             printfn $"%s{fromPath} ==>\n\t%s{toPath}"
-            File.Copy(fromPath, toPath)
+            File.Copy(fromPath, toPath, force)
             cleanupBackups toPath verbose config
             (1, [])
 
@@ -101,7 +101,8 @@ let rec backupFile group basePath glob fromPath toPath verbose config =
                             toPath,
                             toPath
                             + ".bak."
-                            + toModTime.ToString("yyyy_MM_dd_HH_mm_ss")
+                            + toModTime.ToString("yyyy_MM_dd_HH_mm_ss"),
+                            force
                         )
 
                         copyAndCleanup ()
@@ -110,7 +111,7 @@ let rec backupFile group basePath glob fromPath toPath verbose config =
                 | None -> copyAndCleanup ()
 
         if Directory.Exists(fromPath) then
-            backupFiles group basePath glob fromPath toPath verbose config
+            backupFiles group basePath glob fromPath toPath verbose force config
         else if globMatches () then
             backupFile' ()
         else
@@ -124,19 +125,19 @@ let rec backupFile group basePath glob fromPath toPath verbose config =
         warn warning
         (1, [ warning ])
 
-and backupFiles group basePath glob fromPath toPath verbose config =
+and backupFiles group basePath glob fromPath toPath verbose (force: bool) config =
     Directory.EnumerateFileSystemEntries(fromPath)
     |> Seq.fold
         (fun (c, es) path ->
             let file = Path.GetFileName(path)
 
             let newCount, newErrs =
-                backupFile group basePath glob (fromPath +/ file) (toPath +/ file) verbose config
+                backupFile group basePath glob (fromPath +/ file) (toPath +/ file) verbose force config
 
             (c + newCount, es @ newErrs))
         (0, [])
 
-let backupGroup groupName verbose config =
+let backupGroup groupName verbose (force: bool) config =
     let startTime = DateTime.Now
 
     let group =
@@ -146,7 +147,7 @@ let backupGroup groupName verbose config =
     | Some group ->
         if Directory.Exists group.Path then
             let backedUpCount, warnings =
-                backupFiles group.Name group.Path group.Glob group.Path (config.Path +/ groupName) verbose config
+                backupFiles group.Name group.Path group.Glob group.Path (config.Path +/ groupName) verbose force config
 
             if (backedUpCount > 0) then
                 let now = DateTime.Now
@@ -173,7 +174,7 @@ let backupGroup groupName verbose config =
         warnMissingGroups [ groupName ] config
         []
 
-let rec backup (groupNames: option<list<string>>) (loop: bool) (verbose: bool) config =
+let rec backup (groupNames: option<list<string>>) (loop: bool) (verbose: bool) (force: bool) config =
     let groupNames' =
         match groupNames with
         | None -> Array.map (fun g -> g.Name) config.Groups
@@ -184,7 +185,7 @@ let rec backup (groupNames: option<list<string>>) (loop: bool) (verbose: bool) c
         |> Array.fold
             (fun acc group ->
                 try
-                    let warnings = backupGroup group verbose config
+                    let warnings = backupGroup group verbose force config
                     acc @ warnings
                 with
                 | e ->
@@ -206,7 +207,7 @@ let rec backup (groupNames: option<list<string>>) (loop: bool) (verbose: bool) c
 
     if loop then
         Thread.Sleep(TimeSpan.FromMinutes(float config.Frequency))
-        backup groupNames loop verbose config
+        backup groupNames loop verbose force config
     else
         None
 
@@ -353,7 +354,8 @@ let app (parseResults: ParseResults<_>) =
     let command = parseResults.GetSubCommand()
 
     match command with
-    | Backup sp -> backup (sp.TryGetResult BackupArgs.Groups) (sp.Contains Loop) (sp.Contains Verbose)
+    | Backup sp ->
+        backup (sp.TryGetResult BackupArgs.Groups) (sp.Contains Loop) (sp.Contains Verbose) (sp.Contains Force)
     | Add sp -> add (sp.GetResult AddArgs.Group) (sp.GetResult AddArgs.Path) (sp.TryGetResult AddArgs.Glob)
     | List _ -> list
     | Info sp -> info (sp.TryGetResult InfoArgs.Groups)

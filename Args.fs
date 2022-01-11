@@ -7,6 +7,7 @@ type BackupArgs =
     | [<MainCommand>] Groups of groups: list<string>
     | [<AltCommandLine("-l")>] Loop
     | [<AltCommandLine("-v")>] Verbose
+    | [<AltCommandLine("-f")>] Force
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -14,6 +15,7 @@ type BackupArgs =
             | Groups _ -> "List of groups to back up.  If not provided, will back up all groups"
             | Loop -> "Keep running, backing up groups at the interval specified in your config file"
             | Verbose -> "Print verbose output"
+            | Force -> "Force all file backups to overwrite any conflicting files"
 
 type AddArgs =
     | [<MainCommand; Mandatory; Unique>] Group of group: string
