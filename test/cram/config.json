@@ -1,8 +1,8 @@
 {
-    "Path": "./.sbu-backups",
+    "Path": "./.vbu-backups",
     "Frequency": 15,
     "NumToKeep": 3,
-    "Games": [{
+    "Groups": [{
         "Name": "another",
         "Path": "/another/path",
         "Glob": {
@@ -10,7 +10,7 @@
         }
     }, {
         "Name": "test",
-        "Path": "/test/game/path",
+        "Path": "/test/group/path",
         "Glob": null
     }]
 }

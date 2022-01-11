@@ -12,26 +12,26 @@ let printConfigRow label value newValue =
        | Some nv -> $" -> %s{nv}"
        | None -> ""
 
-type Game =
+type Group =
     { Name: string
       Path: string
       Glob: option<string> }
 
-module Game =
+module Group =
     let defaultGlob = "**/*"
 
-    let printUpdated game newName newPath newGlob =
-        printConfigRow "Name" game.Name newName
-        printConfigRow "Save path" game.Path newPath
+    let printUpdated group newName newPath newGlob =
+        printConfigRow "Name" group.Name newName
+        printConfigRow "Path" group.Path newPath
 
-        match (game.Glob, newGlob) with
+        match (group.Glob, newGlob) with
         | Some _, _
-        | None, Some _ -> printConfigRow "Save glob" (Option.defaultValue "" game.Glob) newGlob
+        | None, Some _ -> printConfigRow "Glob" (Option.defaultValue "" group.Glob) newGlob
         | _ -> ()
 
         printfn ""
 
-    let print game = printUpdated game None None None
+    let print group = printUpdated group None None None
 
     let private validNameChars: Set<char> =
         [ 'A' .. 'Z' ]
@@ -46,7 +46,7 @@ type Config =
     { Path: string
       Frequency: int
       NumToKeep: int
-      Games: Game [] }
+      Groups: Group [] }
 
 module Config =
     open Util.Terminal
@@ -54,10 +54,10 @@ module Config =
     let def =
         { Path =
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            +/ ".sbu-backups"
+            +/ ".vbu-backups"
           Frequency = 15
           NumToKeep = 20
-          Games = [||] }
+          Groups = [||] }
 
     let saveDefault path =
         printfn

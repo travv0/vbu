@@ -1,6 +1,6 @@
   $ cp "$TESTDIR/config.json" config.json
 
-list games
-  $ "$TESTDIR/sbu.sh" list
+list groups
+  $ "$TESTDIR/vbu.sh" list
   another
   test

@@ -1,26 +1,26 @@
   $ cp "$TESTDIR/config.json" config.json
 
-list info for all games
-  $ "$TESTDIR/sbu.sh" info
+list info for all groups
+  $ "$TESTDIR/vbu.sh" info
   Name: another
-  Save path: /another/path
-  Save glob: save*
+  Path: /another/path
+  Glob: save*
   
   Name: test
-  Save path: /test/game/path
+  Path: /test/group/path
   
 
-list info for selected games
-  $ "$TESTDIR/sbu.sh" info another
+list info for selected groups
+  $ "$TESTDIR/vbu.sh" info another
   Name: another
-  Save path: /another/path
-  Save glob: save*
+  Path: /another/path
+  Glob: save*
   
 
-  $ "$TESTDIR/sbu.sh" info another new
-  Warning: No game named `new'
+  $ "$TESTDIR/vbu.sh" info another new
+  Warning: No group named `new'
   
   Name: another
-  Save path: /another/path
-  Save glob: save*
+  Path: /another/path
+  Glob: save*
   

@@ -1,33 +1,34 @@
 module Args
 
 open Argu
+open Types
 
 type BackupArgs =
-    | [<MainCommand>] Games of games: list<string>
+    | [<MainCommand>] Groups of groups: list<string>
     | [<AltCommandLine("-l")>] Loop
     | [<AltCommandLine("-v")>] Verbose
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Games _ -> "List of games to back up.  If not provided, will back up all games"
-            | Loop -> "Keep running, backing up games at the interval specified in your config file"
+            | Groups _ -> "List of groups to back up.  If not provided, will back up all groups"
+            | Loop -> "Keep running, backing up groups at the interval specified in your config file"
             | Verbose -> "Print verbose output"
 
 type AddArgs =
-    | [<MainCommand; Mandatory; Unique>] Game of game: string
-    | [<AltCommandLine("-p"); Mandatory>] Path of save_path: string
-    | [<AltCommandLine("-g")>] Glob of save_glob: string
+    | [<MainCommand; Mandatory; Unique>] Group of group: string
+    | [<AltCommandLine("-p"); Mandatory>] Path of path: string
+    | [<AltCommandLine("-g")>] Glob of glob: string
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Game _ -> "Name of game to add"
-            | Path _ -> "Path to added game's save files"
+            | Group _ -> "Name of group to add"
+            | Path _ -> "Path to added group's files"
             | Glob _ ->
-                "Save file glob for added game's save files. Only files \
+                $"File glob for added group's files. Only files \
                 matching this pattern will be backed up. The default is \
-                **/* which will recursively back up all saves in SAVE_PATH"
+                %s{Group.defaultGlob} which will recursively back up all files in PATH"
 
 type ListArgs =
     | [<Hidden>] Hidden
@@ -38,43 +39,43 @@ type ListArgs =
             | Hidden -> ""
 
 type InfoArgs =
-    | [<MainCommand>] Games of games: list<string>
+    | [<MainCommand>] Groups of groups: list<string>
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Games _ ->
-                "List of games to display info for. If not \
-                provided, will display info for all games"
+            | Groups _ ->
+                "List of groups to display info for. If not \
+                provided, will display info for all groups"
 
 type RemoveArgs =
-    | [<MainCommand; Mandatory>] Games of games: list<string>
+    | [<MainCommand; Mandatory>] Groups of groups: list<string>
     | [<AltCommandLine("-y")>] Yes
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Games _ -> "List of games to remove"
+            | Groups _ -> "List of groups to remove"
             | Yes -> "Remove all without confirmation prompts"
 
 type EditArgs =
-    | [<MainCommand; Unique; Mandatory>] Game of game: string
+    | [<MainCommand; Unique; Mandatory>] Group of group: string
     | [<AltCommandLine("-n")>] Name of new_name: string
-    | [<AltCommandLine("-p")>] Path of new_save_path: string
-    | [<AltCommandLine("-g")>] Glob of new_save_glob: string
+    | [<AltCommandLine("-p")>] Path of new_path: string
+    | [<AltCommandLine("-g")>] Glob of new_glob: string
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Game _ -> "Name of game to edit"
+            | Group _ -> "Name of group to edit"
             | Name _ ->
-                "Set game name to NEW_NAME. This will also update the \
+                "Set group name to NEW_NAME. This will also update the \
                 directory name in your backup directory"
-            | Path _ -> "Set game's save path to NEW_SAVE_PATH"
+            | Path _ -> "Set group's path to NEW_PATH"
             | Glob _ ->
-                "Set game's save file glob to NEW_SAVE_FILE_GLOB. \
+                $"Set group's file glob to NEW_FILE_GLOB. \
                 Setting this to an empty string or \"none\" implies the \
-                glob **/* which will recursively back up all files"
+                glob %s{Group.defaultGlob} which will recursively back up all files"
 
 type ConfigArgs =
     | [<AltCommandLine("-p")>] Path of backup_path: string
@@ -84,12 +85,12 @@ type ConfigArgs =
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Path _ -> "Set path to directory in which to back up saves"
-            | Frequency _ -> "Set frequency in minutes to backup saves when looping"
+            | Path _ -> "Set path to directory in which to back up files"
+            | Frequency _ -> "Set frequency in minutes to backup files when looping"
             | Keep _ -> "Set how many copies of each backed-up file to keep"
 
 [<HelpDescription("Show this help text"); HelpFlags("--help", "-h"); NoAppSettings>]
-type SbuArgs =
+type vbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Backup of ParseResults<BackupArgs>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddArgs>
     | [<CliPrefix(CliPrefix.None)>] List of ParseResults<ListArgs>
@@ -103,12 +104,12 @@ type SbuArgs =
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Backup _ -> "Backup your game saves"
-            | Add _ -> "Add games to backup"
-            | List _ -> "List names of games that can be backed up"
-            | Info _ -> "List info for games"
-            | Remove _ -> "Remove games from backup"
-            | Edit _ -> "Edit game info"
-            | Config _ -> "Manage sbu configuration"
+            | Backup _ -> "Backup your files"
+            | Add _ -> "Add groups to backup"
+            | List _ -> "List names of groups that can be backed up"
+            | Info _ -> "List info for groups"
+            | Remove _ -> "Remove groups from backup"
+            | Edit _ -> "Edit group info"
+            | Config _ -> "Manage vbu configuration"
             | ConfigPath _ -> "Path to configuration file"
             | Version -> "Print version information"

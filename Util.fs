@@ -47,5 +47,5 @@ module FileSystem =
 
     let defaultConfigPath =
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-        +/ ".sbu"
+        +/ ".vbu"
         +/ "config.json"

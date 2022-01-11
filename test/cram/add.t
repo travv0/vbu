@@ -1,16 +1,16 @@
   $ cp "$TESTDIR/config.json" config.json
 
-add games to config
-  $ "$TESTDIR/sbu.sh" add new -p "/new" -g "*"
-  Game added successfully:
+add groups to config
+  $ "$TESTDIR/vbu.sh" add new -p "/new" -g "*"
+  Group added successfully:
   
   Name: new
-  Save path: /new
-  Save glob: *
+  Path: /new
+  Glob: *
   
-  $ "$TESTDIR/sbu.sh" add asdf -p "/asdf"
-  Game added successfully:
+  $ "$TESTDIR/vbu.sh" add asdf -p "/asdf"
+  Group added successfully:
   
   Name: asdf
-  Save path: /asdf
+  Path: /asdf
   

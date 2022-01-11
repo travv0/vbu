@@ -2,22 +2,22 @@
   $ cp -r "$TESTDIR/files" files
 
 backup files
-  $ "$TESTDIR/sbu.sh" add files -p files -g "**/*.txt" | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/'
-  Game added successfully:
+  $ "$TESTDIR/vbu.sh" add files -p files -g "**/*.txt" | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/'
+  Group added successfully:
   
   Name: files
-  Save path: $TMP_DIR/backup.t/files
-  Save glob: **/*.txt
+  Path: $TMP_DIR/backup.t/files
+  Glob: **/*.txt
   
 
 
-  $ "$TESTDIR/sbu.sh" config -p backups | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/'
-  Backup path: ./.sbu-backups -> $TMP_DIR/backup.t/backups
+  $ "$TESTDIR/vbu.sh" config -p backups | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/'
+  Backup path: ./.vbu-backups -> $TMP_DIR/backup.t/backups
   Backup frequency (in minutes): 15
   Number of backups to keep: 3
   
 
-  $ "$TESTDIR/sbu-backup.sh"
+  $ "$TESTDIR/vbu-backup.sh"
   Warning: Path set for another doesn't exist: /another/path
   $TMP_DIR/backup.t/files/files/b.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
@@ -30,7 +30,7 @@ backup files
   
   Finished backing up 4 files for files in $SECONDSs on $DATE_AND_TIME
   
-  Warning: Path set for test doesn't exist: /test/game/path
+  Warning: Path set for test doesn't exist: /test/group/path
 
 check backup directory contents
   $ ls backups/files
@@ -48,7 +48,7 @@ check backup directory contents
 check versioning
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
-  $ "$TESTDIR/sbu-backup.sh"
+  $ "$TESTDIR/vbu-backup.sh"
   Warning: Path set for another doesn't exist: /another/path
   $TMP_DIR/backup.t/files/files/b.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
@@ -57,11 +57,11 @@ check versioning
   
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
   
-  Warning: Path set for test doesn't exist: /test/game/path
+  Warning: Path set for test doesn't exist: /test/group/path
 
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
-  $ "$TESTDIR/sbu-backup.sh"
+  $ "$TESTDIR/vbu-backup.sh"
   Warning: Path set for another doesn't exist: /another/path
   $TMP_DIR/backup.t/files/files/b.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
@@ -70,11 +70,11 @@ check versioning
   
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
   
-  Warning: Path set for test doesn't exist: /test/game/path
+  Warning: Path set for test doesn't exist: /test/group/path
 
   $ sleep 1 && touch files/a.txt && touch files/files/b.txt && touch files/files/c.txt && touch files/files/files/\[0-9\].txt
 
-  $ "$TESTDIR/sbu-backup.sh"
+  $ "$TESTDIR/vbu-backup.sh"
   Warning: Path set for another doesn't exist: /another/path
   $TMP_DIR/backup.t/files/files/b.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
@@ -89,7 +89,7 @@ check versioning
   
   Finished backing up 4 files for files in $SECONDSs on $DATE_AND_TIME
   
-  Warning: Path set for test doesn't exist: /test/game/path
+  Warning: Path set for test doesn't exist: /test/group/path
 
   $ ls backups/files/files | sed -E -e 's/bak\.[0-9_]+/bak.$TIMESTAMP/'
   b.txt
@@ -105,7 +105,7 @@ check versioning
   [0-9].txt.bak.$TIMESTAMP
 
 keep all
-  $ "$TESTDIR/sbu.sh" config --keep 0 | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/' 
+  $ "$TESTDIR/vbu.sh" config --keep 0 | sed -E -e 's/[^[:space:]]+cramtests-[^/]+/$TMP_DIR/' 
   Backup path: $TMP_DIR/backup.t/backups
   Backup frequency (in minutes): 15
   Number of backups to keep: 3 -> 0
@@ -113,7 +113,7 @@ keep all
 
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
-  $ "$TESTDIR/sbu-backup.sh"
+  $ "$TESTDIR/vbu-backup.sh"
   Warning: Path set for another doesn't exist: /another/path
   $TMP_DIR/backup.t/files/files/b.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
@@ -122,7 +122,7 @@ keep all
   
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
   
-  Warning: Path set for test doesn't exist: /test/game/path
+  Warning: Path set for test doesn't exist: /test/group/path
 
   $ ls backups/files/files | sed -E -e 's/bak\.[0-9_]+/bak.$TIMESTAMP/'
   b.txt
