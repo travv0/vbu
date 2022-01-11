@@ -18,18 +18,18 @@ backup files
   
 
   $ "$TESTDIR/vbu-backup.sh"
-  Warning: Path set for another doesn't exist: /another/path
-  $TMP_DIR/backup.t/files/files/b.txt ==>
+  
+  
+  \t$TMP_DIR/backup.t/backups/files/a.txt (esc)
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
-  $TMP_DIR/backup.t/files/files/c.txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/c.txt (esc)
-  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
   $TMP_DIR/backup.t/files/a.txt ==>
-  \t$TMP_DIR/backup.t/backups/files/a.txt (esc)
-  
+  $TMP_DIR/backup.t/files/files/b.txt ==>
+  $TMP_DIR/backup.t/files/files/c.txt ==>
+  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   Finished backing up 4 files for files in $SECONDSs on $DATE_AND_TIME
-  
+  Warning: Path set for another doesn't exist: /another/path
   Warning: Path set for test doesn't exist: /test/group/path
 
 check backup directory contents
@@ -49,46 +49,46 @@ check versioning
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
   $ "$TESTDIR/vbu-backup.sh"
-  Warning: Path set for another doesn't exist: /another/path
-  $TMP_DIR/backup.t/files/files/b.txt ==>
+  
+  
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
-  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
-  
+  $TMP_DIR/backup.t/files/files/b.txt ==>
+  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
-  
+  Warning: Path set for another doesn't exist: /another/path
   Warning: Path set for test doesn't exist: /test/group/path
 
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
   $ "$TESTDIR/vbu-backup.sh"
-  Warning: Path set for another doesn't exist: /another/path
-  $TMP_DIR/backup.t/files/files/b.txt ==>
+  
+  
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
-  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
-  
+  $TMP_DIR/backup.t/files/files/b.txt ==>
+  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
-  
+  Warning: Path set for another doesn't exist: /another/path
   Warning: Path set for test doesn't exist: /test/group/path
 
   $ sleep 1 && touch files/a.txt && touch files/files/b.txt && touch files/files/c.txt && touch files/files/files/\[0-9\].txt
 
   $ "$TESTDIR/vbu-backup.sh"
-  Warning: Path set for another doesn't exist: /another/path
-  $TMP_DIR/backup.t/files/files/b.txt ==>
-  \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
-  Note: Deleting $TMP_DIR/backup.t/backups/files/files/b.txt.bak.$TIMESTAMP
-  $TMP_DIR/backup.t/files/files/c.txt ==>
-  \t$TMP_DIR/backup.t/backups/files/files/c.txt (esc)
-  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
-  \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
-  Note: Deleting $TMP_DIR/backup.t/backups/files/files/files/[0-9].txt.bak.$TIMESTAMP
-  $TMP_DIR/backup.t/files/a.txt ==>
+  
+  
   \t$TMP_DIR/backup.t/backups/files/a.txt (esc)
-  
+  \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
+  \t$TMP_DIR/backup.t/backups/files/files/c.txt (esc)
+  \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
+  $TMP_DIR/backup.t/files/a.txt ==>
+  $TMP_DIR/backup.t/files/files/b.txt ==>
+  $TMP_DIR/backup.t/files/files/c.txt ==>
+  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   Finished backing up 4 files for files in $SECONDSs on $DATE_AND_TIME
-  
+  Note: Deleting $TMP_DIR/backup.t/backups/files/files/b.txt.bak.$TIMESTAMP
+  Note: Deleting $TMP_DIR/backup.t/backups/files/files/files/[0-9].txt.bak.$TIMESTAMP
+  Warning: Path set for another doesn't exist: /another/path
   Warning: Path set for test doesn't exist: /test/group/path
 
   $ ls backups/files/files | sed -E -e 's/bak\.[0-9_]+/bak.$TIMESTAMP/'
@@ -114,14 +114,14 @@ keep all
   $ sleep 1 && touch files/files/b.txt && touch files/files/files/\[0-9\].txt
 
   $ "$TESTDIR/vbu-backup.sh"
-  Warning: Path set for another doesn't exist: /another/path
-  $TMP_DIR/backup.t/files/files/b.txt ==>
+  
+  
   \t$TMP_DIR/backup.t/backups/files/files/b.txt (esc)
-  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   \t$TMP_DIR/backup.t/backups/files/files/files/[0-9].txt (esc)
-  
+  $TMP_DIR/backup.t/files/files/b.txt ==>
+  $TMP_DIR/backup.t/files/files/files/[0-9].txt ==>
   Finished backing up 2 files for files in $SECONDSs on $DATE_AND_TIME
-  
+  Warning: Path set for another doesn't exist: /another/path
   Warning: Path set for test doesn't exist: /test/group/path
 
   $ ls backups/files/files | sed -E -e 's/bak\.[0-9_]+/bak.$TIMESTAMP/'
