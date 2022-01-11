@@ -27,17 +27,22 @@ let warnMissingGames (games: list<string>) config =
 
 let cleanupBackups (backupPath: string) verbose config =
     if config.NumToKeep > 0 then
+        let backupDir = Path.GetDirectoryName(backupPath)
+        let backupFileName = Path.GetFileName(backupPath)
+
         let glob =
             Glob.Parse(
-                backupPath
-                + ".bak.[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]"
+                backupDir
+                +/ "*.bak.[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]"
             )
 
-        let allFiles =
-            Directory.EnumerateFiles(Path.GetDirectoryName(backupPath))
+        let allFiles = Directory.EnumerateFiles(backupDir)
 
         let files =
-            Seq.filter (fun f -> glob.IsMatch(f: string)) allFiles
+            allFiles
+            |> Seq.filter (fun f ->
+                Path.GetFileName(f).StartsWith(backupFileName)
+                && glob.IsMatch(f))
             |> Seq.append (seq { backupPath })
             |> Seq.toList
 
@@ -365,7 +370,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "sbu v1.3.0"
+            printfn "sbu v1.3.1"
         else
             let configPath =
                 parseResults.TryGetResult ConfigPath
