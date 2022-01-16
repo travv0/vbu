@@ -24,6 +24,43 @@
         "resolved": "6.0.1",
         "contentHash": "VrFAiW8dEEekk+0aqlbvMNZzDvYXmgWZwAt68AUBqaWK8RnoEVUNglj66bZzhs4/U63q0EfXlhcEKnH1sTYLjw=="
       },
+      "FSharpx.Extras": {
+        "type": "Direct",
+        "requested": "[3.0.0, )",
+        "resolved": "3.0.0",
+        "contentHash": "OhtlHRerkDJUDkflGMncMR4fJWEVQTbNGq0wJXS6zFzi71OVTtZfSytXyxY4VLNA2KiWONk+RKv/crELGtlgzw==",
+        "dependencies": {
+          "FSharp.Core": "4.6.2",
+          "FSharpx.Async": "1.14.1",
+          "FSharpx.Collections": "2.1.2",
+          "System.Reflection.Emit.Lightweight": "4.7.0"
+        }
+      },
+      "FSharp.Control.AsyncSeq": {
+        "type": "Transitive",
+        "resolved": "2.0.21",
+        "contentHash": "Ebj5Uy+07R6+Nj4Dr1o/UrQqrAsNRAJ9AYEYnc8oEECxp/DBmt1oTK66e/s+caqnQ2mdF7a3U3YN4A48xqyOQA==",
+        "dependencies": {
+          "FSharp.Core": "4.3.2"
+        }
+      },
+      "FSharpx.Async": {
+        "type": "Transitive",
+        "resolved": "1.14.1",
+        "contentHash": "4MJz9KejMkozw6iKDOKgVJV81ZYCTF0K/1KBM7724GEnohNuMljhnP+IO8auzyCtg770TXAC25FFuJR/pUJdoQ==",
+        "dependencies": {
+          "FSharp.Control.AsyncSeq": "2.0.21",
+          "FSharp.Core": "4.6.2"
+        }
+      },
+      "FSharpx.Collections": {
+        "type": "Transitive",
+        "resolved": "2.1.2",
+        "contentHash": "gNsAqSmhj0pKkeLlZCQf4/LfSXSIH+lg9eQ2aN6Jt5t77oMZeH5IIJ3dshvMdHCtI+TbZvlv/3dyeOUwLd3Qkw==",
+        "dependencies": {
+          "FSharp.Core": "4.3.4"
+        }
+      },
       "System.Configuration.ConfigurationManager": {
         "type": "Transitive",
         "resolved": "4.4.0",
@@ -32,13 +69,11 @@
           "System.Security.Cryptography.ProtectedData": "4.4.0"
         }
       },
-      "System.Security.Cryptography.ProtectedData": {
+      "System.Reflection.Emit.Lightweight": {
         "type": "Transitive",
-        "resolved": "4.4.0",
-        "contentHash": "cJV7ScGW7EhatRsjehfvvYVBvtiSMKgN8bOVI0bQhnF5bU7vnHVIsH49Kva7i7GWaWYvmEzkYVk1TC+gZYBEog=="
-      }
-    },
-    ".NETCoreApp,Version=v5.0/linux-x64": {
+        "resolved": "4.7.0",
+        "contentHash": "a4OLB4IITxAXJeV74MDx49Oq2+PsF6Sml54XAFv+2RyWwtDBcabzoxiiJRhdhx+gaohLh4hEGCLQyBozXoQPqA=="
+      },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Transitive",
         "resolved": "4.4.0",
