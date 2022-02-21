@@ -5,9 +5,7 @@
     "Groups": [{
         "Name": "another",
         "Path": "/another/path",
-        "Glob": {
-            "Value": "save*"
-        }
+        "Glob": "save*"
     }, {
         "Name": "test",
         "Path": "/test/group/path",
