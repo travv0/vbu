@@ -9,8 +9,7 @@ open System.Threading
 
 open Args
 open Types
-open Util.FileSystem
-open Util.Terminal
+open Util
 
 let warnMissingGroups (groups: list<string>) =
     reader {
@@ -80,7 +79,7 @@ let rec backupFile group basePath glob fromPath toPath verbose (force: bool) =
             let copyAndCleanup () =
                 reader {
                     Directory.CreateDirectory(Path.GetDirectoryName(toPath: string))
-                    |> ignore
+                    |> ignore<DirectoryInfo>
 
                     printfn $"%s{fromPath} ==>\n\t%s{toPath}"
                     File.Copy(fromPath, toPath, force)
@@ -427,7 +426,7 @@ let main argv =
             parser.ParseCommandLine(inputs = argv, raiseOnUsage = true)
 
         if parseResults.Contains Version then
-            printfn "vbu v1.3.2"
+            printfn "vbu v1.3.3"
         else
             let configPath =
                 parseResults.TryGetResult ConfigPath
@@ -441,7 +440,9 @@ let main argv =
             | Some c ->
                 match Path.GetDirectoryName(configPath).Trim() with
                 | "" -> ()
-                | configDir -> Directory.CreateDirectory(configDir) |> ignore
+                | configDir ->
+                    Directory.CreateDirectory(configDir)
+                    |> ignore<DirectoryInfo>
 
                 Config.save configPath c
     with

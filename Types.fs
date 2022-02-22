@@ -3,7 +3,7 @@ module Types
 open System
 open System.IO
 open System.Text.Json
-open Util.FileSystem
+open Util
 
 let printConfigRow label value newValue =
     printfn "%s: %s%s" label value
@@ -49,8 +49,6 @@ type Config =
       Groups: Group [] }
 
 module Config =
-    open Util.Terminal
-
     let def =
         { Path =
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
@@ -70,7 +68,9 @@ module Config =
 
         match Path.GetDirectoryName(path: string) with
         | "" -> ()
-        | path -> Directory.CreateDirectory(path) |> ignore
+        | path ->
+            Directory.CreateDirectory(path)
+            |> ignore<DirectoryInfo>
 
         File.WriteAllText(path, JsonSerializer.Serialize(def))
 

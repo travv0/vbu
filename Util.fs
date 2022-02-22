@@ -3,6 +3,7 @@ module Util
 open System
 open System.IO
 
+[<AutoOpen; RequireQualifiedAccess>]
 module Terminal =
     let withColor color f =
         Console.ForegroundColor <- color
@@ -33,6 +34,7 @@ module Terminal =
         | "" -> false
         | _ -> promptYorN prompt
 
+[<AutoOpen; RequireQualifiedAccess>]
 module FileSystem =
     let (+/) (path1: string) path2 = Path.Join(path1, path2)
 
@@ -49,3 +51,15 @@ module FileSystem =
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
         +/ ".vbu"
         +/ "config.json"
+
+[<AutoOpen>]
+module Operators =
+
+    [<RequiresExplicitTypeArguments>]
+    /// <summary>
+    /// Ignore the passed value. This is often used to throw away results of a computation.
+    /// </summary>
+    /// <param name="value">The value to ignore</param>
+    /// <typeparam name="'a">the type of value to expect, and ignore</typeparam>
+    /// <returns>unit</returns>
+    let ignore<'a> (value: 'a) = ignore<'a> value
