@@ -12,10 +12,13 @@ type BackupArgs =
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Groups _ -> "List of groups to back up.  If not provided, will back up all groups"
-            | Loop -> "Keep running, backing up groups at the interval specified in your config file"
+            | Groups _ ->
+                "List of groups to back up.  If not provided, will back up all groups"
+            | Loop ->
+                "Keep running, backing up groups at the interval specified in your config file"
             | Verbose -> "Print verbose output"
-            | Force -> "Force all file backups to overwrite any conflicting files"
+            | Force ->
+                "Force all file backups to overwrite any conflicting files"
 
 type AddArgs =
     | [<MainCommand; Mandatory; Unique>] Group of group: string
@@ -88,10 +91,13 @@ type ConfigArgs =
         member this.Usage =
             match this with
             | Path _ -> "Set path to directory in which to back up files"
-            | Frequency _ -> "Set frequency in minutes to backup files when looping"
+            | Frequency _ ->
+                "Set frequency in minutes to backup files when looping"
             | Keep _ -> "Set how many copies of each backed-up file to keep"
 
-[<HelpDescription("Show this help text"); HelpFlags("--help", "-h"); NoAppSettings>]
+[<HelpDescription("Show this help text");
+  HelpFlags("--help", "-h");
+  NoAppSettings>]
 type vbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Backup of ParseResults<BackupArgs>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddArgs>
@@ -100,7 +106,8 @@ type vbuArgs =
     | [<CliPrefix(CliPrefix.None)>] Remove of ParseResults<RemoveArgs>
     | [<CliPrefix(CliPrefix.None)>] Edit of ParseResults<EditArgs>
     | [<CliPrefix(CliPrefix.None)>] Config of ParseResults<ConfigArgs>
-    | [<CustomCommandLine("--config"); AltCommandLine("-c")>] ConfigPath of config_path: string
+    | [<CustomCommandLine("--config"); AltCommandLine("-c")>] ConfigPath of
+        config_path: string
     | [<AltCommandLine("-V")>] Version
 
     interface IArgParserTemplate with

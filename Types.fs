@@ -26,7 +26,8 @@ module Group =
 
         match (group.Glob, newGlob) with
         | Some _, _
-        | None, Some _ -> printConfigRow "Glob" (Option.defaultValue "" group.Glob) newGlob
+        | None, Some _ ->
+            printConfigRow "Glob" (Option.defaultValue "" group.Glob) newGlob
         | _ -> ()
 
         printfn ""
@@ -51,8 +52,8 @@ type Config =
 module Config =
     let def =
         { Path =
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            +/ ".vbu-backups"
+              Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+              +/ ".vbu-backups"
           Frequency = 15
           NumToKeep = 20
           Groups = [||] }
@@ -76,8 +77,17 @@ module Config =
 
     let printUpdated config newBackupDir newBackupFreq newBackupsToKeep =
         printConfigRow "Backup path" config.Path newBackupDir
-        printConfigRow "Backup frequency (in minutes)" (string config.Frequency) (Option.map string newBackupFreq)
-        printConfigRow "Number of backups to keep" (string config.NumToKeep) (Option.map string newBackupsToKeep)
+
+        printConfigRow
+            "Backup frequency (in minutes)"
+            (string config.Frequency)
+            (Option.map string newBackupFreq)
+
+        printConfigRow
+            "Number of backups to keep"
+            (string config.NumToKeep)
+            (Option.map string newBackupsToKeep)
+
         printfn ""
 
     let print config = printUpdated config None None None
